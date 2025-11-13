@@ -1,30 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import type { Route } from "./+types/interview";
+import { Layout } from "~/components/layout/Layout";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { Badge } from "~/components/ui/badge";
+import { interviewApi, ApiError } from "~/lib/api";
+import { INTERVIEWER_LABELS } from "~/types/interview";
+import type { InterviewerType, Message } from "~/types/interview";
+import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Entretien en cours - Entretien d'Embauche IA" },
+    { title: "Entretien en cours - Entervio" },
     { name: "description", content: "Entretien d'embauche avec recruteur IA" },
   ];
 }
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  timestamp: Date;
-}
-
-type InterviewerType = "nice" | "neutral" | "mean";
-
-const API_BASE_URL = `http://${window.location.hostname}:8000/api/v1/voice`;
-
-const interviewerLabels = {
-  nice: { name: "Bienveillant", icon: "😊", color: "text-green-700", bg: "bg-green-50" },
-  neutral: { name: "Neutre", icon: "😐", color: "text-blue-700", bg: "bg-blue-50" },
-  mean: { name: "Exigeant", icon: "😤", color: "text-red-700", bg: "bg-red-50" },
-};
 
 export default function Interview() {
   const { interviewId } = useParams();
@@ -32,7 +24,8 @@ export default function Interview() {
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [candidateName, setCandidateName] = useState<string>("");
-  const [interviewerType, setInterviewerType] = useState<InterviewerType>("neutral");
+  const [interviewerType, setInterviewerType] =
+    useState<InterviewerType>("neutral");
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [interviewStarted, setInterviewStarted] = useState(false);
@@ -47,7 +40,6 @@ export default function Interview() {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load interview data on mount
   useEffect(() => {
     if (interviewId) {
       loadInterviewData();
@@ -56,7 +48,6 @@ export default function Interview() {
     }
   }, [interviewId, navigate]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -66,19 +57,7 @@ export default function Interview() {
       setIsLoading(true);
       setError(null);
 
-      // Get session info
-      const response = await fetch(`${API_BASE_URL}/interview/${interviewId}/info`);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError("Session non trouvée. Redirection...");
-          setTimeout(() => navigate("/"), 2000);
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await interviewApi.getInterviewInfo(interviewId!);
 
       setSessionId(data.session_id);
       setCandidateName(data.candidate_name);
@@ -86,29 +65,26 @@ export default function Interview() {
       setQuestionCount(data.question_count);
       setInterviewStarted(true);
 
-      // Load conversation history
       await loadConversationHistory();
 
       setIsLoading(false);
     } catch (err) {
       console.error("Error loading interview:", err);
-      setError("Impossible de charger l'entretien.");
+      if (err instanceof ApiError && err.status === 404) {
+        setError("Session non trouvée. Redirection...");
+        setTimeout(() => navigate("/"), 2000);
+      } else {
+        setError("Impossible de charger l'entretien.");
+      }
       setIsLoading(false);
     }
   };
 
   const loadConversationHistory = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/interview/${interviewId}/history`);
+      const data = await interviewApi.getConversationHistory(interviewId!);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Convert history to messages
-      const loadedMessages: Message[] = data.history.map((msg: any, index: number) => ({
+      const loadedMessages: Message[] = data.history.map((msg, index) => ({
         id: `${Date.now()}-${index}`,
         role: msg.role === "assistant" ? "assistant" : "user",
         text: msg.content,
@@ -117,7 +93,6 @@ export default function Interview() {
 
       setMessages(loadedMessages);
 
-      // Play the last assistant message if it exists
       if (loadedMessages.length > 0) {
         const lastMessage = loadedMessages[loadedMessages.length - 1];
         if (lastMessage.role === "assistant" && interviewId) {
@@ -126,7 +101,6 @@ export default function Interview() {
       }
     } catch (err) {
       console.error("Error loading conversation history:", err);
-      // Don't show error - history is optional
     }
   };
 
@@ -134,23 +108,16 @@ export default function Interview() {
     try {
       setIsPlayingAudio(true);
 
-      // Stop any currently playing audio
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;
       }
 
-      // Create audio element
-      const audio = new Audio(
-        `${API_BASE_URL}/interview/${sid}/audio?text=${encodeURIComponent(text)}`
-      );
-
+      const audio = new Audio(interviewApi.getAudioUrl(sid, text));
       currentAudioRef.current = audio;
 
-      // Play audio
       await audio.play();
 
-      // Wait for audio to finish
       await new Promise<void>((resolve, reject) => {
         audio.onended = () => {
           setIsPlayingAudio(false);
@@ -165,7 +132,6 @@ export default function Interview() {
     } catch (err) {
       console.error("Error playing audio:", err);
       setIsPlayingAudio(false);
-      // Don't show error to user - audio is optional
     }
   };
 
@@ -185,7 +151,6 @@ export default function Interview() {
 
       mediaRecorder.onstop = async () => {
         await processRecording();
-        // Stop all tracks
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -214,33 +179,14 @@ export default function Interview() {
     setIsProcessing(true);
 
     try {
-      // Create blob from recorded chunks
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: "audio/webm",
+      });
 
-      // Create form data
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.webm");
-      formData.append("language", "fr");
+      const data = await interviewApi.submitResponse(sessionId, audioBlob);
 
-      // Send to API
-      const response = await fetch(
-        `${API_BASE_URL}/interview/${sessionId}/respond`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Update question count
       setQuestionCount(data.question_count);
 
-      // Add user message
       const userMessage: Message = {
         id: `${Date.now()}-user`,
         role: "user",
@@ -248,7 +194,6 @@ export default function Interview() {
         timestamp: new Date(),
       };
 
-      // Add assistant response
       const assistantMessage: Message = {
         id: `${Date.now()}-assistant`,
         role: "assistant",
@@ -258,7 +203,6 @@ export default function Interview() {
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
-      // Play response audio
       if (sessionId) {
         await playAudio(sessionId, data.response);
       }
@@ -277,20 +221,8 @@ export default function Interview() {
     try {
       setIsProcessing(true);
 
-      const response = await fetch(
-        `${API_BASE_URL}/interview/${sessionId}/end`,
-        {
-          method: "POST",
-        }
-      );
+      const data = await interviewApi.endInterview(sessionId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Add summary message
       const summaryMessage: Message = {
         id: Date.now().toString(),
         role: "assistant",
@@ -300,7 +232,6 @@ export default function Interview() {
 
       setMessages((prev) => [...prev, summaryMessage]);
 
-      // Play summary audio
       if (sessionId) {
         await playAudio(sessionId, data.summary);
       }
@@ -315,272 +246,62 @@ export default function Interview() {
   };
 
   const restartInterview = () => {
-    // Stop any playing audio
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
     }
-
-    // Navigate back to setup
-    navigate("/");
+    navigate("/setup");
   };
 
-  // Handle loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <svg
-            className="animate-spin w-16 h-16 mx-auto mb-4 text-indigo-600"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          <p className="text-lg text-gray-600">Chargement de l'entretien...</p>
+      <Layout>
+        <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
+          <Card className="border-2">
+            <CardContent className="p-12 text-center">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg
+                  className="animate-spin w-8 h-8 text-primary"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              </div>
+              <p className="text-lg font-semibold text-secondary">
+                Chargement de votre entretien...
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Préparation de l'environnement
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      </Layout>
     );
   }
 
-  // Handle missing data
   if (!interviewId || !sessionId || !candidateName) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center bg-white rounded-2xl shadow-lg p-8 max-w-md">
-          <div className="text-6xl mb-4">❌</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Session introuvable</h2>
-          <p className="text-gray-600 mb-6">
-            Cette session d'entretien n'existe pas ou a expiré.
-          </p>
-          <button
-            onClick={() => navigate("/")}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
-          >
-            Retour à l'accueil
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Get interviewer info (with fallback)
-  const interviewerInfo = interviewerLabels[interviewerType] || interviewerLabels.neutral;
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                🎯 Entretien d'Embauche
-              </h1>
-              <div className="flex items-center gap-3 text-gray-600">
-                <span className="font-medium">Candidat: {candidateName}</span>
-                <span className="text-gray-400">•</span>
-                <div className={`flex items-center gap-1 ${interviewerInfo.color}`}>
-                  <span className="text-lg">{interviewerInfo.icon}</span>
-                  <span className="font-medium">{interviewerInfo.name}</span>
-                </div>
-              </div>
-              <div className="mt-2 text-xs text-gray-500 font-mono">
-                ID: {interviewId}
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    sessionId ? "bg-green-500" : "bg-gray-400"
-                  } animate-pulse`}
-                ></div>
-                <span className="text-sm text-gray-600">
-                  {sessionId ? "Actif" : "Inactif"}
-                </span>
-              </div>
-              {interviewStarted && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
-                    Question {questionCount}/5
-                  </span>
-                  {isPlayingAudio && (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium flex items-center gap-1">
-                      <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" />
-                      </svg>
-                      Audio
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Error Banner */}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center justify-between">
-            <span>{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-700 hover:text-red-900"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Messages Container */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 h-[500px] overflow-y-auto">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-              <svg
-                className="w-20 h-20 mb-4 animate-pulse"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              <p className="text-lg font-medium">Chargement de l'entretien...</p>
-              <p className="text-sm text-center mt-2">
-                Le recruteur {interviewerInfo.name.toLowerCase()} vous attend
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-6 py-3 ${
-                      message.role === "user"
-                        ? "bg-indigo-600 text-white"
-                        : `${interviewerInfo.bg} text-gray-800 border-2 ${interviewerInfo.color.replace(
-                            "text-",
-                            "border-"
-                          )}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium opacity-75">
-                        {message.role === "user"
-                          ? `👤 ${candidateName}`
-                          : `${interviewerInfo.icon} Recruteur`}
-                      </span>
-                      <span className="text-xs opacity-50">
-                        {message.timestamp.toLocaleTimeString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {message.text}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Controls */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Record Button */}
-            <button
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={
-                !sessionId || isProcessing || !interviewStarted || isPlayingAudio
-              }
-              className={`flex-1 py-4 px-6 rounded-xl font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                isRecording
-                  ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                  : "bg-indigo-600 hover:bg-indigo-700"
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                {isRecording ? (
-                  <>
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                      <rect x="6" y="6" width="12" height="12" rx="2" />
-                    </svg>
-                    <span>Arrêter</span>
-                  </>
-                ) : isProcessing ? (
-                  <>
-                    <svg
-                      className="animate-spin w-6 h-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    <span>Traitement...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                    </svg>
-                    <span>Répondre</span>
-                  </>
-                )}
-              </div>
-            </button>
-
-            {/* End Interview Button */}
-            <button
-              onClick={endInterview}
-              disabled={
-                !sessionId ||
-                !interviewStarted ||
-                messages.length < 2 ||
-                isProcessing
-              }
-              className="sm:w-auto px-6 py-4 rounded-xl font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="flex items-center justify-center gap-2">
+      <Layout>
+        <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
+          <Card className="max-w-md border-2">
+            <CardContent className="text-center pt-12 pb-8">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg
-                  className="w-5 h-5"
+                  className="w-10 h-10 text-red-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -589,62 +310,519 @@ export default function Interview() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   />
                 </svg>
-                <span className="hidden sm:inline">Terminer</span>
               </div>
-            </button>
+              <h2 className="text-2xl font-bold text-secondary mb-2">
+                Session introuvable
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                Cette session d'entretien n'existe pas ou a expiré.
+              </p>
+              <Button onClick={() => navigate("/")} size="lg">
+                Retour à l'accueil
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
-            {/* Restart Button */}
-            {!interviewStarted && messages.length > 0 && (
-              <button
-                onClick={restartInterview}
-                className="sm:w-auto px-6 py-4 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 transition-all duration-200"
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">Nouvel entretien</span>
+  const interviewerInfo =
+    INTERVIEWER_LABELS[interviewerType] || INTERVIEWER_LABELS.neutral;
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-6 py-8 max-w-6xl">
+        {/* Header Card */}
+        <Card className="mb-6 border-2 shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-md">
+                    <svg
+                      className="w-6 h-6 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-secondary">
+                      Entretien en cours
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                      Session active
+                    </p>
+                  </div>
                 </div>
-              </button>
+
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <div className="flex items-center gap-2 bg-muted/20 px-3 py-1.5 rounded-lg">
+                    <svg
+                      className="w-4 h-4 text-primary"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="font-medium text-secondary">
+                      {candidateName}
+                    </span>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-lg",
+                      interviewerInfo.bg
+                    )}
+                  >
+                    <span className="text-lg">{interviewerInfo.icon}</span>
+                    <span className={cn("font-medium", interviewerInfo.color)}>
+                      {interviewerInfo.name}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/10 px-3 py-1.5 rounded-lg font-mono">
+                    <svg
+                      className="w-3 h-3"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    ID: {interviewId?.slice(0, 8)}...
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-start lg:items-end gap-3">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full animate-pulse",
+                      sessionId ? "bg-emerald-500" : "bg-gray-400"
+                    )}
+                  />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {sessionId ? "En ligne" : "Hors ligne"}
+                  </span>
+                </div>
+
+                {interviewStarted && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant="default"
+                      className="bg-primary hover:bg-primary-600"
+                    >
+                      <svg
+                        className="w-3 h-3 mr-1"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Question {questionCount}/5
+                    </Badge>
+
+                    {isPlayingAudio && (
+                      <Badge variant="secondary" className="animate-pulse">
+                        <svg
+                          className="w-3 h-3 mr-1"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
+                        </svg>
+                        Audio en cours
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Error Banner */}
+        {error && (
+          <Alert variant="destructive" className="mb-6 border-2">
+            <AlertDescription className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>{error}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setError(null)}
+                className="h-auto p-1 hover:bg-transparent"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Messages Container */}
+          <div className="lg:col-span-2">
+            <Card className="border-2 shadow-lg">
+              <CardContent className="p-0">
+                <div className="h-[600px] overflow-y-auto p-6 bg-gradient-to-b from-muted/5 to-transparent">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                        <svg
+                          className="w-10 h-10 text-primary animate-pulse"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                          />
+                        </svg>
+                      </div>
+                      <p className="text-lg font-semibold text-secondary mb-2">
+                        Préparation de l'entretien
+                      </p>
+                      <p className="text-sm text-muted-foreground max-w-sm">
+                        Le recruteur {interviewerInfo.name.toLowerCase()} va vous
+                        poser sa première question
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            "flex animate-in fade-in slide-in-from-bottom-4 duration-300",
+                            message.role === "user"
+                              ? "justify-end"
+                              : "justify-start"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "max-w-[85%] rounded-2xl px-5 py-3 shadow-md",
+                              message.role === "user"
+                                ? "bg-gradient-to-br from-primary to-accent text-white"
+                                : cn(
+                                    "bg-white border-2",
+                                    interviewerInfo.border
+                                  )
+                            )}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <div
+                                className={cn(
+                                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold",
+                                  message.role === "user"
+                                    ? "bg-white/20 text-white"
+                                    : cn(interviewerInfo.bg, interviewerInfo.color)
+                                )}
+                              >
+                                {message.role === "user" ? (
+                                  <svg
+                                    className="w-3.5 h-3.5"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <span>{interviewerInfo.icon}</span>
+                                )}
+                              </div>
+                              <span
+                                className={cn(
+                                  "text-xs font-medium",
+                                  message.role === "user"
+                                    ? "text-white/90"
+                                    : "text-muted-foreground"
+                                )}
+                              >
+                                {message.role === "user"
+                                  ? candidateName
+                                  : "Recruteur"}
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-xs",
+                                  message.role === "user"
+                                    ? "text-white/70"
+                                    : "text-muted-foreground/70"
+                                )}
+                              >
+                                {message.timestamp.toLocaleTimeString("fr-FR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                            <p
+                              className={cn(
+                                "text-sm leading-relaxed whitespace-pre-wrap",
+                                message.role === "user"
+                                  ? "text-white"
+                                  : "text-secondary"
+                              )}
+                            >
+                              {message.text}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Controls Sidebar */}
+          <div className="space-y-6">
+            {/* Recording Controls */}
+            <Card className="border-2 shadow-lg">
+              <CardContent className="p-6 space-y-4">
+                <h3 className="font-semibold text-secondary mb-4">Contrôles</h3>
+
+                <Button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={
+                    !sessionId ||
+                    isProcessing ||
+                    !interviewStarted ||
+                    isPlayingAudio
+                  }
+                  variant={isRecording ? "destructive" : "default"}
+                  className={cn(
+                    "w-full h-16 text-base font-semibold shadow-md",
+                    isRecording && "animate-pulse"
+                  )}
+                >
+                  {isRecording ? (
+                    <>
+                      <div className="w-5 h-5 bg-white rounded mr-3" />
+                      Arrêter l'enregistrement
+                    </>
+                  ) : isProcessing ? (
+                    <>
+                      <svg
+                        className="animate-spin w-5 h-5 mr-3"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Traitement en cours...
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5 mr-3"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                      </svg>
+                      Répondre vocalement
+                    </>
+                  )}
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={endInterview}
+                    disabled={
+                      !sessionId ||
+                      !interviewStarted ||
+                      messages.length < 2 ||
+                      isProcessing
+                    }
+                    variant="secondary"
+                    className="flex-1 h-12"
+                  >
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Terminer
+                  </Button>
+
+                  {!interviewStarted && messages.length > 0 && (
+                    <Button
+                      onClick={restartInterview}
+                      variant="outline"
+                      className="flex-1 h-12"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      Nouveau
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Instructions */}
+            <Card className="border-2 bg-gradient-to-br from-primary/5 to-accent/5">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg
+                      className="w-5 h-5 text-primary"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-secondary mb-2">
+                      Instructions
+                    </h3>
+                    <ul className="text-sm text-muted-foreground space-y-2">
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>
+                          Attendez la fin de l'audio du recruteur avant de répondre
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>
+                          Cliquez sur "Répondre" et parlez clairement
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>
+                          Cliquez sur "Arrêter" quand vous avez terminé
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Progress */}
+            {interviewStarted && (
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-secondary mb-4">
+                    Progression
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Questions</span>
+                      <span className="font-semibold text-secondary">
+                        {questionCount}/5
+                      </span>
+                    </div>
+                    <div className="h-2 bg-muted/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+                        style={{ width: `${(questionCount / 5) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
-
-          {/* Instructions */}
-          <div
-            className={`mt-4 p-4 rounded-lg border-2 ${interviewerInfo.bg} ${interviewerInfo.color.replace(
-              "text-",
-              "border-"
-            )}`}
-          >
-            <p className="text-sm text-gray-700">
-              <strong>💡 Instructions :</strong> Attendez que le recruteur termine sa
-              question (l'audio doit finir de jouer), puis cliquez sur "Répondre" pour
-              parler. Cliquez sur "Arrêter" quand vous avez fini de parler.
-            </p>
-          </div>
-        </div>
-
-        {/* Footer Info */}
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>🤖 Propulsé par Groq Whisper • Google Gemini • Edge TTS</p>
-          <p className="mt-1 text-xs">
-            Simulation d'entretien 100% IA pour améliorer vos compétences
-          </p>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

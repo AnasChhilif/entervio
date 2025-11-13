@@ -1,6 +1,21 @@
 import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
+/**
+ * import { type RouteConfig, index, route } from "@react-router/dev/routes";
+
 export default [
-  index("routes/setup.tsx"),
+  index("routes/_index.tsx"),
+  route("setup", "routes/setup.tsx"),
+  route("interviews", "routes/interviews.tsx"),
+  route("account", "routes/account.tsx"),
+  route("interview/:interviewId", "routes/interview.$interviewId.tsx"),
+] satisfies RouteConfig;
+ */
+
+export default [
+  index("routes/_index.tsx"),
+  route("setup", "routes/setup.tsx"),
+  route("interviews", "routes/interviews.tsx"),
+  route("account", "routes/account.tsx"),
   route("interview/:interviewId", "routes/interview.tsx"),
 ] satisfies RouteConfig;

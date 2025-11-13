@@ -1,69 +1,74 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/setup";
+import { Layout } from "~/components/layout/Layout";
+import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { interviewApi, ApiError } from "~/lib/api";
+import type { InterviewerType } from "~/types/interview";
+import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Configuration - Entretien d'Embauche IA" },
-    { name: "description", content: "Configurez votre entretien avec un recruteur IA" },
+    { title: "Configuration - Entervio" },
+    {
+      name: "description",
+      content: "Configurez votre entretien avec un recruteur IA",
+    },
   ];
 }
 
-type InterviewerType = "nice" | "neutral" | "mean";
-
-interface InterviewerOption {
-  type: InterviewerType;
-  label: string;
-  icon: string;
-  description: string;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-}
-
-const interviewerOptions: InterviewerOption[] = [
+const INTERVIEWER_CONFIGS = [
   {
-    type: "nice",
+    type: "nice" as InterviewerType,
     label: "Bienveillant",
-    icon: "😊",
-    description: "Un recruteur chaleureux et encourageant qui vous met à l'aise",
-    color: "text-green-700",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-300",
+    emoji: "😊",
+    description: "Un recruteur encourageant qui vous met en confiance",
+    gradient: "from-emerald-500 to-teal-600",
+    bgColor: "bg-emerald-50",
+    borderColor: "border-emerald-400",
+    hoverBorder: "hover:border-emerald-500",
   },
   {
-    type: "neutral",
-    label: "Neutre",
-    icon: "😐",
-    description: "Un recruteur professionnel et objectif, factuel dans ses évaluations",
-    color: "text-blue-700",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-300",
+    type: "neutral" as InterviewerType,
+    label: "Professionnel",
+    emoji: "😐",
+    description: "Un recruteur objectif et factuel dans ses évaluations",
+    gradient: "from-primary to-accent",
+    bgColor: "bg-primary-50",
+    borderColor: "border-primary-400",
+    hoverBorder: "hover:border-primary-500",
   },
   {
-    type: "mean",
+    type: "mean" as InterviewerType,
     label: "Exigeant",
-    icon: "😤",
-    description: "Un recruteur direct et critique qui teste votre résistance au stress",
-    color: "text-red-700",
-    bgColor: "bg-red-50",
-    borderColor: "border-red-300",
+    emoji: "😤",
+    description: "Un recruteur direct qui teste votre gestion du stress",
+    gradient: "from-orange-500 to-red-600",
+    bgColor: "bg-orange-50",
+    borderColor: "border-orange-400",
+    hoverBorder: "hover:border-orange-500",
   },
 ];
-
-const API_BASE_URL = `http://${window.location.hostname}:8000/api/v1/voice`;
 
 export default function Setup() {
   const navigate = useNavigate();
   const [candidateName, setCandidateName] = useState("");
-  const [selectedInterviewer, setSelectedInterviewer] = useState<InterviewerType | null>(
-    null
-  );
+  const [selectedInterviewer, setSelectedInterviewer] =
+    useState<InterviewerType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
   const handleStart = async () => {
-    // Validation
     if (!candidateName.trim()) {
       setError("Veuillez entrer votre nom");
       return;
@@ -78,127 +83,153 @@ export default function Setup() {
     setError(null);
 
     try {
-      // Create interview via API
-      const response = await fetch(`${API_BASE_URL}/interview/start`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          candidate_name: candidateName.trim(),
-          interviewer_type: selectedInterviewer,
-        }),
+      const data = await interviewApi.startInterview({
+        candidate_name: candidateName.trim(),
+        interviewer_type: selectedInterviewer,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Navigate to interview with the session_id as the URL parameter
       navigate(`/interview/${data.session_id}`);
     } catch (err) {
       console.error("Error starting interview:", err);
-      setError("Impossible de démarrer l'entretien. Veuillez réessayer.");
+      if (err instanceof ApiError) {
+        setError(
+          err.status === 404
+            ? "Service non disponible"
+            : "Impossible de démarrer l'entretien. Veuillez réessayer."
+        );
+      } else {
+        setError("Impossible de démarrer l'entretien. Veuillez réessayer.");
+      }
       setIsStarting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <Layout>
+      <div className="container mx-auto px-6 py-12 max-w-5xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            🎯 Entretien d'Embauche IA
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            Configuration de votre entretien
           </h1>
-          <p className="text-gray-600 text-lg">
-            Préparez-vous pour votre prochain entretien
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Personnalisez votre expérience pour un entraînement optimal
           </p>
         </div>
 
         {/* Main Setup Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          {/* Name Input */}
-          <div className="mb-8">
-            <label
-              htmlFor="name"
-              className="block text-lg font-semibold text-gray-700 mb-3"
-            >
-              1. Comment vous appelez-vous ?
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={candidateName}
-              onChange={(e) => {
-                setCandidateName(e.target.value);
-                setError(null);
-              }}
-              placeholder="Entrez votre nom"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors text-lg"
-              autoFocus
-              disabled={isStarting}
-            />
-          </div>
+        <Card className="mb-8 border-2 border-gray-200 shadow-lg bg-white">
+          <CardContent className="p-8 md:p-10">
+            {/* Name Input */}
+            <div className="mb-10">
+              <Label
+                htmlFor="name"
+                className="text-lg font-semibold mb-4 block text-gray-900"
+              >
+                1. Votre identité
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                value={candidateName}
+                onChange={(e) => {
+                  setCandidateName(e.target.value);
+                  setError(null);
+                }}
+                placeholder="Prénom et nom"
+                className="text-lg h-14 border-2 border-gray-300 focus:border-primary text-gray-900"
+                autoFocus
+                disabled={isStarting}
+              />
+              <p className="text-sm text-gray-600 mt-2">
+                Cette information sera utilisée durant l'entretien
+              </p>
+            </div>
 
-          {/* Interviewer Selection */}
-          <div className="mb-8">
-            <label className="block text-lg font-semibold text-gray-700 mb-3">
-              2. Choisissez votre type de recruteur
-            </label>
-            <div className="grid md:grid-cols-3 gap-4">
-              {interviewerOptions.map((option) => (
-                <button
-                  key={option.type}
-                  onClick={() => {
-                    setSelectedInterviewer(option.type);
-                    setError(null);
-                  }}
-                  disabled={isStarting}
-                  className={`p-6 rounded-xl border-2 transition-all duration-200 text-left hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                    selectedInterviewer === option.type
-                      ? `${option.borderColor} ${option.bgColor} shadow-lg`
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="text-4xl mb-3">{option.icon}</div>
-                  <h3
-                    className={`text-xl font-bold mb-2 ${
-                      selectedInterviewer === option.type
-                        ? option.color
-                        : "text-gray-800"
-                    }`}
+            {/* Interviewer Selection */}
+            <div className="mb-10">
+              <Label className="text-lg font-semibold mb-4 block text-gray-900">
+                2. Profil du recruteur
+              </Label>
+              <div className="grid md:grid-cols-3 gap-5">
+                {INTERVIEWER_CONFIGS.map((config) => (
+                  <button
+                    key={config.type}
+                    onClick={() => {
+                      setSelectedInterviewer(config.type);
+                      setError(null);
+                    }}
+                    disabled={isStarting}
+                    className={cn(
+                      "relative p-6 rounded-2xl border-2 transition-all duration-300 text-left group",
+                      "hover:scale-[1.02] hover:shadow-xl",
+                      "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-none",
+                      selectedInterviewer === config.type
+                        ? `${config.borderColor} shadow-xl ${config.bgColor}`
+                        : `border-gray-300 ${config.hoverBorder} bg-white`
+                    )}
                   >
-                    {option.label}
-                  </h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {option.description}
-                  </p>
-                </button>
-              ))}
+                    {selectedInterviewer === config.type && (
+                      <div className="absolute top-3 right-3">
+                        <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                          <svg
+                            className="w-4 h-4 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                    <div className="text-4xl mb-4">
+                      {config.emoji}
+                    </div>
+                    <h3 className="text-xl font-bold mb-2 text-gray-900">
+                      {config.label}
+                    </h3>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {config.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded-lg">
-              <p className="text-red-700 text-sm font-medium">{error}</p>
-            </div>
-          )}
+            {/* Error Message */}
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertDescription className="flex items-center text-red-800">
+                  <svg
+                    className="w-5 h-5 mr-2"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {/* Start Button */}
-          <button
-            onClick={handleStart}
-            disabled={!candidateName.trim() || !selectedInterviewer || isStarting}
-            className="w-full py-4 px-6 rounded-xl font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-indigo-600"
-          >
-            <div className="flex items-center justify-center gap-2">
+            {/* Start Button */}
+            <Button
+              onClick={handleStart}
+              disabled={!candidateName.trim() || !selectedInterviewer || isStarting}
+              className="w-full text-lg h-16 shadow-lg hover:shadow-xl bg-primary hover:bg-primary-600"
+            >
               {isStarting ? (
                 <>
                   <svg
-                    className="animate-spin w-6 h-6"
+                    className="animate-spin w-5 h-5 mr-3"
                     fill="none"
                     viewBox="0 0 24 24"
                   >
@@ -216,13 +247,13 @@ export default function Setup() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  <span>Démarrage...</span>
+                  Initialisation de l'entretien...
                 </>
               ) : (
                 <>
-                  <span className="text-lg">Commencer l'entretien</span>
+                  Lancer l'entretien
                   <svg
-                    className="w-6 h-6"
+                    className="w-5 h-5 ml-3"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -236,64 +267,57 @@ export default function Setup() {
                   </svg>
                 </>
               )}
-            </div>
-          </button>
-        </div>
+            </Button>
+          </CardContent>
+        </Card>
 
-        {/* Info Cards */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="text-2xl">⏱️</span>
-              Durée
-            </h3>
-            <p className="text-gray-600 text-sm">
-              L'entretien dure environ 5 questions. Prévoyez 10-15 minutes.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="text-2xl">🎤</span>
-              Microphone requis
-            </h3>
-            <p className="text-gray-600 text-sm">
-              Autorisez l'accès à votre microphone pour répondre vocalement aux
-              questions.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="text-2xl">💾</span>
-              Sauvegarde
-            </h3>
-            <p className="text-gray-600 text-sm">
-              Votre entretien est sauvegardé. Vous pouvez y revenir avec le lien de
-              session.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="text-2xl">💡</span>
-              Conseil
-            </h3>
-            <p className="text-gray-600 text-sm">
-              Répondez naturellement et prenez votre temps. Il n'y a pas de mauvaises
-              réponses.
-            </p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-600">
-          <p>🤖 Propulsé par Groq Whisper • Google Gemini • Edge TTS</p>
-          <p className="mt-1 text-xs">
-            Entraînez-vous autant de fois que nécessaire pour gagner en confiance
-          </p>
+        {/* Info Grid */}
+        <div className="grid md:grid-cols-2 gap-5">
+          {[
+            {
+              icon: "⏱️",
+              title: "Durée estimée",
+              desc: "Environ 10-15 minutes pour 5 questions ciblées",
+            },
+            {
+              icon: "🎤",
+              title: "Microphone requis",
+              desc: "Autorisez l'accès pour des réponses vocales naturelles",
+            },
+            {
+              icon: "💾",
+              title: "Sauvegarde automatique",
+              desc: "Retrouvez vos entretiens à tout moment via l'historique",
+            },
+            {
+              icon: "📊",
+              title: "Feedback détaillé",
+              desc: "Analyse approfondie de vos performances en fin de session",
+            },
+          ].map((item, index) => (
+            <Card
+              key={index}
+              className="border-2 border-gray-200 hover:shadow-lg transition-shadow bg-white"
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold text-gray-900">
+                      {item.title}
+                    </CardTitle>
+                    <CardDescription className="text-sm mt-1 text-gray-600">
+                      {item.desc}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+          ))}
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
