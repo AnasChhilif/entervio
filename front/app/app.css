@@ -28,11 +28,3 @@ body {
 ::-webkit-scrollbar-track {
   @apply bg-gray-100;
 }
-
-::-webkit-scrollbar-thumb {
-  @apply bg-primary/40 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-primary/60;
-}

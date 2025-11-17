@@ -38,7 +38,7 @@ class GradingService:
             interviewer_style: Style of interviewer for grading context
         """
         try:
-            logger.info(f"🔄 Starting background grading for QA {qa_id}...")
+            logger.info(f"Starting background grading for QA {qa_id}...")
             
             # Grade the response
             grade = await self.llm_service.grade_response(
@@ -53,12 +53,12 @@ class GradingService:
                 qa.feedback = grade["feedback"]
                 qa.grade = int(grade["grade"])
                 db.commit()
-                logger.info(f"✅ Background grading completed for QA {qa_id}: Grade {grade['grade']}")
+                logger.info(f"Background grading completed for QA {qa_id}: Grade {grade['grade']}")
             else:
-                logger.warning(f"⚠️ QA record {qa_id} not found during grading update")
+                logger.warning(f"QA record {qa_id} not found during grading update")
                 
         except Exception as e:
-            logger.error(f"❌ Error in background grading for QA {qa_id}: {str(e)}")
+            logger.error(f"Error in background grading for QA {qa_id}: {str(e)}")
             db.rollback()
 
 
