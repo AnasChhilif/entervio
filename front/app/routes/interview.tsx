@@ -165,7 +165,7 @@ export default function Interview() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-md">
+                  <div className="w-12 h-12 bg-linear-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-md">
                     <svg
                       className="w-6 h-6 text-white"
                       fill="none"
@@ -334,7 +334,7 @@ export default function Interview() {
           <div className="lg:col-span-2">
             <Card className="border-2 shadow-lg">
               <CardContent className="p-0">
-                <div className="h-[600px] overflow-y-auto p-6 bg-gradient-to-b from-muted/5 to-transparent">
+                <div className="h-[600px] overflow-y-auto p-6 bg-linear-to-b from-muted/5 to-transparent">
                   {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center">
                       <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -376,7 +376,7 @@ export default function Interview() {
                             className={cn(
                               "max-w-[85%] rounded-2xl px-5 py-3 shadow-md",
                               message.role === "user"
-                                ? "bg-gradient-to-br from-primary to-accent text-white"
+                                ? "bg-linear-to-br from-primary to-accent"
                                 : cn(
                                     "bg-white border-2",
                                     interviewerInfo.border
@@ -388,7 +388,7 @@ export default function Interview() {
                                 className={cn(
                                   "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold",
                                   message.role === "user"
-                                    ? "bg-white/20 text-white"
+                                    ? "bg-black/10 text-black"
                                     : cn(interviewerInfo.bg, interviewerInfo.color)
                                 )}
                               >
@@ -412,7 +412,7 @@ export default function Interview() {
                                 className={cn(
                                   "text-xs font-medium",
                                   message.role === "user"
-                                    ? "text-white/90"
+                                    ? "text-black"
                                     : "text-muted-foreground"
                                 )}
                               >
@@ -424,7 +424,7 @@ export default function Interview() {
                                 className={cn(
                                   "text-xs",
                                   message.role === "user"
-                                    ? "text-white/70"
+                                    ? "text-black/70"
                                     : "text-muted-foreground/70"
                                 )}
                               >
@@ -438,7 +438,7 @@ export default function Interview() {
                               className={cn(
                                 "text-sm leading-relaxed whitespace-pre-wrap",
                                 message.role === "user"
-                                  ? "text-white"
+                                  ? "text-black"
                                   : "text-secondary"
                               )}
                             >
@@ -574,7 +574,7 @@ export default function Interview() {
             </Card>
 
             {/* Instructions */}
-            <Card className="border-2 bg-gradient-to-br from-primary/5 to-accent/5">
+            <Card className="border-2 bg-linear-to-br from-primary/5 to-accent/5">
               <CardContent className="p-6">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -635,7 +635,7 @@ export default function Interview() {
                     </div>
                     <div className="h-2 bg-muted/20 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+                        className="h-full bg-linear-to-r from-primary to-accent transition-all duration-500"
                         style={{ width: `${(questionCount / 5) * 100}%` }}
                       />
                     </div>

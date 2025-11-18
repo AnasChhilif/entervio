@@ -10,7 +10,7 @@ interface QuestionAnswer {
 }
 
 interface InterviewSummary {
-  global_feedback: string;
+  feedback: string;
   questions: QuestionAnswer[];
 }
 

@@ -53,7 +53,7 @@ export default function Feedback() {
       {/* Global Feedback */}
       <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
         <h2 className="text-2xl font-semibold mb-4">Feedback Général</h2>
-        <p className="text-gray-800 whitespace-pre-wrap">{summary.global_feedback}</p>
+        <p className="text-gray-800 whitespace-pre-wrap">{summary.feedback}</p>
       </div>
 
       {/* Question & Answer Pairs */}
