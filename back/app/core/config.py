@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: str = ""
 
     ELEVENLABS_VOICE_ID: str = "imRmmzTqlLHt9Do1HufF"
-    GROQ_API_KEY: str = Field(..., env="GROQ_API_KEY")
-    GEMINI_API_KEY: str = Field(..., env="GEMINI_API_KEY")
+    GROQ_API_KEY: str = Field(default="", env="GROQ_API_KEY")
+    GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
     TTS_VOICE: str = Field(default="fr-FR-DeniseNeural")
     TTS_RATE: str = Field(default="+0%")
     TTS_VOLUME: str = Field(default="+0%")

@@ -110,25 +110,31 @@ class LLMService:
         api_key = settings.GEMINI_API_KEY
         
         if not api_key:
-            error_msg = (
-                "❌ GEMINI_API_KEY not found! "
-                "Please add it to your .env file: GEMINI_API_KEY=..."
+            logger.warning(
+                "⚠️  GEMINI_API_KEY not configured. "
+                "LLM features will not work. Add GEMINI_API_KEY to .env"
             )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            self.api_key = None
+            self.client_ready = False
+            return
         
         logger.info(f"✓ Found GEMINI_API_KEY: {api_key[:10]}...{api_key[-5:]}")
         
         try:
             genai.configure(api_key=api_key)
+            self.api_key = api_key
+            self.client_ready = True
             # Note: Model will be created per-session with appropriate system prompt
             logger.info("✅ Gemini client initialized successfully!")
         except Exception as e:
             logger.error(f"❌ Failed to initialize Gemini client: {str(e)}")
-            raise
+            self.client_ready = False
+            self.api_key = None
     
     def _create_model(self, interviewer_type: InterviewerType, candidate_context: str = "", job_description: str = ""):
         """Create a Gemini model with the appropriate system prompt."""
+        if not self.client_ready:
+            raise ValueError("Gemini client not initialized. Please set GEMINI_API_KEY in .env")
         system_prompt = get_system_prompt(interviewer_type, candidate_context, job_description)
         return genai.GenerativeModel(
             'gemini-2.0-flash-lite-preview-02-05',
