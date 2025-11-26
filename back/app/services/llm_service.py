@@ -95,7 +95,6 @@ def get_system_prompt(interviewer_type: InterviewerType, candidate_context: str 
     
     if candidate_context:
         base_prompt += f"\n\nCONTEXTE DU CANDIDAT (CV):\n{candidate_context}\n\nINSTRUCTION: Utilise ce contexte pour poser des questions personnalisées sur l'expérience et les compétences du candidat."
-    print(base_prompt)    
     return base_prompt
 
 

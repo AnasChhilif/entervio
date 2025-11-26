@@ -1,4 +1,5 @@
 """Voice/Audio REST API Endpoints"""
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
