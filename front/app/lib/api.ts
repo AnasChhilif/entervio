@@ -1,7 +1,12 @@
+<<<<<<< HEAD
 // API base URL now uses relative path since we have a proxy
 // API base URL now uses relative path since we have a proxy
 const API_BASE_URL = "http://localhost:8000/api/v1";
 const VOICE_API_URL = "http://localhost:8000/api/v1/voice";
+=======
+const API_AUDIO_URL = "/api/v1/voice";
+const API_INTERVIEW_URL = "/api/v1/interviews";
+>>>>>>> master
 
 export interface InterviewStartRequest {
   candidate_name: string;
@@ -65,7 +70,11 @@ export const interviewApi = {
   async startInterview(
     data: InterviewStartRequest
   ): Promise<InterviewStartResponse> {
+<<<<<<< HEAD
     const response = await fetch(`${VOICE_API_URL}/interview/start`, {
+=======
+    const response = await fetch(`${API_INTERVIEW_URL}/start`, {
+>>>>>>> master
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -92,7 +101,11 @@ export const interviewApi = {
    */
   async getInterviewInfo(sessionId: string): Promise<InterviewInfoResponse> {
     const response = await fetch(
+<<<<<<< HEAD
       `${VOICE_API_URL}/interview/${sessionId}/info`
+=======
+      `${API_INTERVIEW_URL}/${sessionId}/info`
+>>>>>>> master
     );
 
     if (!response.ok) {
@@ -114,7 +127,11 @@ export const interviewApi = {
     sessionId: string
   ): Promise<ConversationHistoryResponse> {
     const response = await fetch(
+<<<<<<< HEAD
       `${VOICE_API_URL}/interview/${sessionId}/history`
+=======
+      `${API_INTERVIEW_URL}/${sessionId}/history`
+>>>>>>> master
     );
 
     if (!response.ok) {
@@ -140,7 +157,11 @@ export const interviewApi = {
     formData.append("language", language);
 
     const response = await fetch(
+<<<<<<< HEAD
       `${VOICE_API_URL}/interview/${sessionId}/respond`,
+=======
+      `${API_INTERVIEW_URL}/${sessionId}/respond`,
+>>>>>>> master
       {
         method: "POST",
         body: formData,
@@ -161,7 +182,11 @@ export const interviewApi = {
    * End an interview and get summary
    */
   async endInterview(sessionId: string): Promise<InterviewEndResponse> {
+<<<<<<< HEAD
     const response = await fetch(`${VOICE_API_URL}/interview/${sessionId}/end`, {
+=======
+    const response = await fetch(`${API_INTERVIEW_URL}/${sessionId}/end`, {
+>>>>>>> master
       method: "POST",
     });
 
@@ -179,7 +204,11 @@ export const interviewApi = {
    * Get audio URL for text-to-speech
    */
   getAudioUrl(sessionId: string, text: string): string {
+<<<<<<< HEAD
     return `${VOICE_API_URL}/interview/${sessionId}/audio?text=${encodeURIComponent(
+=======
+    return `${API_AUDIO_URL}/audio?interview_id=${sessionId}&text=${encodeURIComponent(
+>>>>>>> master
       text
     )}`;
   },

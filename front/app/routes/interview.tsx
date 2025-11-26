@@ -147,6 +147,134 @@ export default function Interview() {
                 <span>{interviewerInfo.name}</span>
               </div>
             </div>
+<<<<<<< HEAD
+=======
+          </CardContent>
+        </Card>
+
+        {/* Error Banner */}
+        {error && (
+          <Alert variant="destructive" className="mb-6 border-2">
+            <AlertDescription className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <X className="w-5 h-5 shrink-0" />
+                <span>{error}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setError(null)}
+                className="h-auto p-1 hover:bg-transparent"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Messages Container */}
+          <div className="lg:col-span-2">
+            <Card className="border-2 shadow-lg">
+              <CardContent className="p-0">
+                <div className="h-[600px] overflow-y-auto p-6 bg-linear-to-b from-muted/5 to-transparent">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                        <MessageSquare className="w-10 h-10 text-primary animate-pulse" />
+                      </div>
+                      <p className="text-lg font-semibold text-secondary mb-2">
+                        Préparation de l'entretien
+                      </p>
+                      <p className="text-sm text-muted-foreground max-w-sm">
+                        Le recruteur {interviewerInfo.name.toLowerCase()} va vous
+                        poser sa première question
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            "flex animate-in fade-in slide-in-from-bottom-4 duration-300",
+                            message.role === "user"
+                              ? "justify-end"
+                              : "justify-start"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "max-w-[85%] rounded-2xl px-5 py-3 shadow-md",
+                              message.role === "user"
+                                ? "bg-linear-to-br from-primary to-accent"
+                                : cn(
+                                    "bg-white border-2",
+                                    interviewerInfo.border
+                                  )
+                            )}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <div
+                                className={cn(
+                                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold",
+                                  message.role === "user"
+                                    ? "bg-black/10 text-black"
+                                    : cn(interviewerInfo.bg, interviewerInfo.color)
+                                )}
+                              >
+                                {message.role === "user" ? (
+                                  <User className="w-3.5 h-3.5" />
+                                ) : (
+                                  <span>{interviewerInfo.icon}</span>
+                                )}
+                              </div>
+                              <span
+                                className={cn(
+                                  "text-xs font-medium",
+                                  message.role === "user"
+                                    ? "text-black"
+                                    : "text-muted-foreground"
+                                )}
+                              >
+                                {message.role === "user"
+                                  ? candidateName
+                                  : "Recruteur"}
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-xs",
+                                  message.role === "user"
+                                    ? "text-black/70"
+                                    : "text-muted-foreground/70"
+                                )}
+                              >
+                                {message.timestamp.toLocaleTimeString("fr-FR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                            <p
+                              className={cn(
+                                "text-sm leading-relaxed whitespace-pre-wrap",
+                                message.role === "user"
+                                  ? "text-black"
+                                  : "text-secondary"
+                              )}
+                            >
+                              {message.text}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+>>>>>>> master
           </div>
 
           <div className="flex items-center gap-4">
@@ -162,6 +290,107 @@ export default function Interview() {
               </span>
             </div>
 
+<<<<<<< HEAD
+=======
+                <Button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={
+                    !sessionId ||
+                    isProcessing ||
+                    !interviewStarted ||
+                    isPlayingAudio
+                  }
+                  className={cn(
+                    "w-full h-16 text-base font-semibold shadow-md",
+                    isRecording && "animate-pulse"
+                  )}
+                >
+                  {isRecording ? (
+                    <>
+                      <CircleDot className="w-5 h-5 mr-3" />
+                      Arrêter l'enregistrement
+                    </>
+                  ) : isProcessing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                      Traitement en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-5 h-5 mr-3" />
+                      Répondre vocalement
+                    </>
+                  )}
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleEndInterview}
+                    disabled={
+                      !sessionId ||
+                      !interviewStarted ||
+                      messages.length < 2 ||
+                      isProcessing
+                    }
+                    variant="secondary"
+                    className="flex-1 h-12"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Terminer
+                  </Button>
+
+                  {!interviewStarted && messages.length > 0 && (
+                    <Button
+                      onClick={restartInterview}
+                      variant="outline"
+                      className="flex-1 h-12"
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Nouveau
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Instructions */}
+            <Card className="border-2 bg-linear-to-br from-primary/5 to-accent/5">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                    <Info className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-secondary mb-2">
+                      Instructions
+                    </h3>
+                    <ul className="text-sm text-muted-foreground space-y-2">
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>
+                          Attendez la fin de l'audio du recruteur avant de répondre
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>
+                          Cliquez sur "Répondre" et parlez clairement
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>
+                          Cliquez sur "Arrêter" quand vous avez terminé
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Progress */}
+>>>>>>> master
             {interviewStarted && (
               <div className="flex items-center gap-3 pl-4 border-l border-border">
                 <span className="text-xs font-mono">

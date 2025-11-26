@@ -10,7 +10,6 @@ interface SetupStore {
   isStarting: boolean;
   isUploading: boolean;
 
-  // Actions
   setCandidateName: (name: string) => void;
   setSelectedInterviewer: (type: InterviewerType) => void;
   setError: (error: string | null) => void;
