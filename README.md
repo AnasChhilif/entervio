@@ -37,6 +37,7 @@ Entervio is a modern, full-stack application that simulates realistic job interv
 ### Backend Setup
 
 ```bash
+git clone https://github.com/AnasChhilif/entervio.git
 cd back
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
@@ -63,14 +64,3 @@ Run the entire stack with a single command:
 ```bash
 docker compose up --build
 ```
-
-## 🧪 Testing
-
-Run backend tests:
-
-```bash
-cd back
-pytest
-```
-
----
