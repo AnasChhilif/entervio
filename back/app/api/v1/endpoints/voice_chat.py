@@ -1,9 +1,11 @@
 """Voice/Audio REST API Endpoints"""
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import tempfile
 import os
+from typing import Literal, Optional
 import logging
 
 from app.services.interview_service import interview_service
@@ -14,8 +16,36 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+InterviewerType = Literal["nice", "neutral", "mean"]
 
-@router.get("/audio")
+
+class StartInterviewRequest(BaseModel):
+    candidate_name: str
+    interviewer_type: InterviewerType
+    candidate_id: Optional[int] = None
+
+
+@router.post("/interview/start")
+async def start_interview(
+    request: StartInterviewRequest,
+    db: Session = Depends(get_db)
+):
+    """Start a new interview session."""
+    try:
+        result = await interview_service.start_interview(
+            db=db,
+            candidate_name=request.candidate_name,
+            interviewer_style=request.interviewer_type,
+            candidate_id=request.candidate_id
+        )
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Error starting interview: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/interview/{interview_id}/audio")
 async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db)):
     """Convert text to speech and return audio file."""
     try:
@@ -33,7 +63,6 @@ async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db))
             # Collect all audio chunks
             async for audio_chunk in voice_service.text_to_speech_stream(
                 text,
-                voice=settings.TTS_VOICE
             ):
                 temp_file.write(audio_chunk)
         

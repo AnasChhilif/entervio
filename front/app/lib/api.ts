@@ -1,9 +1,10 @@
-const API_AUDIO_URL = "/api/v1/voice";
-const API_INTERVIEW_URL = "/api/v1/interviews";
+const API_BASE_URL = "/api/v1";
 
 export interface InterviewStartRequest {
   candidate_name: string;
   interviewer_type: "nice" | "neutral" | "mean";
+  candidate_id?: number;
+  job_description?: string;
 }
 
 export interface InterviewStartResponse {
@@ -38,6 +39,13 @@ export interface InterviewEndResponse {
   summary: string;
 }
 
+export interface UploadResumeResponse {
+  message: string;
+  candidate_id: number;
+  name: string;
+  skills: any;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -55,7 +63,7 @@ export const interviewApi = {
   async startInterview(
     data: InterviewStartRequest
   ): Promise<InterviewStartResponse> {
-    const response = await fetch(`${API_INTERVIEW_URL}/start`, {
+    const response = await fetch(`${API_BASE_URL}/voice/interview/start`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -63,6 +71,8 @@ export const interviewApi = {
       body: JSON.stringify({
         candidate_name: data.candidate_name,
         interviewer_type: data.interviewer_type,
+        candidate_id: data.candidate_id,
+        job_description: data.job_description
       }),
     });
 
@@ -81,7 +91,7 @@ export const interviewApi = {
    */
   async getInterviewInfo(sessionId: string): Promise<InterviewInfoResponse> {
     const response = await fetch(
-      `${API_INTERVIEW_URL}/${sessionId}/info`
+      `${API_BASE_URL}/interviews/${sessionId}/info`
     );
 
     if (!response.ok) {
@@ -103,7 +113,7 @@ export const interviewApi = {
     sessionId: string
   ): Promise<ConversationHistoryResponse> {
     const response = await fetch(
-      `${API_INTERVIEW_URL}/${sessionId}/history`
+      `${API_BASE_URL}/interviews/${sessionId}/history`
     );
 
     if (!response.ok) {
@@ -129,7 +139,7 @@ export const interviewApi = {
     formData.append("language", language);
 
     const response = await fetch(
-      `${API_INTERVIEW_URL}/${sessionId}/respond`,
+      `${API_BASE_URL}/interviews/${sessionId}/respond`,
       {
         method: "POST",
         body: formData,
@@ -150,7 +160,7 @@ export const interviewApi = {
    * End an interview and get summary
    */
   async endInterview(sessionId: string): Promise<InterviewEndResponse> {
-    const response = await fetch(`${API_INTERVIEW_URL}/${sessionId}/end`, {
+    const response = await fetch(`${API_BASE_URL}/interviews/${sessionId}/end`, {
       method: "POST",
     });
 
@@ -168,8 +178,30 @@ export const interviewApi = {
    * Get audio URL for text-to-speech
    */
   getAudioUrl(sessionId: string, text: string): string {
-    return `${API_AUDIO_URL}/audio?interview_id=${sessionId}&text=${encodeURIComponent(
+    return `${API_BASE_URL}/voice/interview/${sessionId}/audio?text=${encodeURIComponent(
       text
     )}`;
+  },
+
+  /**
+   * Upload a resume
+   */
+  async uploadResume(file: File): Promise<UploadResumeResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE_URL}/candidates/upload_resume`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Failed to upload resume: ${response.status}`
+      );
+    }
+
+    return response.json();
   },
 };

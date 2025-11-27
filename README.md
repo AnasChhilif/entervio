@@ -1,112 +1,73 @@
-# Interview Practice Platform
+# Entervio 🎙️
 
-An AI-powered SaaS platform for job seekers to practice interviews in French.
+**AI-Powered Voice Interview Platform**
 
-## Features (Planned)
+Entervio is a modern, full-stack application that simulates realistic job interviews using AI. It features a sleek, minimalist design, real-time voice interaction, and comprehensive feedback to help candidates improve their skills.
 
-- 🎯 Multiple interview types (technical, behavioral, case study)
-- 🎭 Different interviewer personalities (friendly, strict, neutral)
-- 🎤 Voice-based interviews using speech-to-text and text-to-speech
-- 📊 Detailed feedback and analysis on answers
-- 🇫🇷 French language support
+![Interview Interface](assets/screenshots/interview.png)
 
-## Tech Stack
+## ✨ Features
 
-**Backend:**
-- FastAPI
-- SQLAlchemy
-- SQLite (development) / PostgreSQL (production)
-- OpenAI Whisper (speech-to-text)
-- ElevenLabs/OpenAI TTS (text-to-speech)
-- Anthropic Claude (interview generation & analysis)
+-   **🤖 AI Interviewer**: Powered by LLMs to conduct dynamic, context-aware interviews.
+-   **🗣️ Real-time Voice Interaction**: Seamless speech-to-text and text-to-speech for a natural conversation flow.
+-   **🎨 Sleek & Minimalist UI**: A distraction-free, "Clean & Light" aesthetic designed for focus.
+-   **📝 Job Context**: Customize the interview based on specific job descriptions.
+-   **📊 Detailed Feedback**: Receive comprehensive grading and actionable advice after every session.
+-   **🎭 Configurable Personas**: Choose from different interviewer styles (Neutral, Friendly, Strict).
 
-**Frontend:**
-- React
-- React Router
-- Tailwind CSS
+## 📸 Screenshots
 
-## Setup
+| Setup | Feedback |
+|:---:|:---:|
+| ![Setup Page](assets/screenshots/setup.png) | ![Feedback Page](assets/screenshots/feedback.png) |
+
+## 🛠️ Tech Stack
+
+-   **Frontend**: React (Vite), Tailwind CSS, Lucide Icons
+-   **Backend**: Python (FastAPI), SQLAlchemy, SQLite
+-   **AI/ML**: OpenAI / Anthropic (LLM), ElevenLabs (TTS), Whisper (STT)
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Python 3.11+ (3.13 recommended)
-- Node.js 18+ (for frontend)
+-   Python 3.11+
+-   Node.js 18+
+-   API Keys (OpenAI, ElevenLabs)
 
 ### Backend Setup
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/interview-platform.git
-cd interview-platform/backend
-```
-
-2. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
+git clone https://github.com/AnasChhilif/entervio.git
+cd back
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
-```
-
-4. Create `.env` file from template:
-```bash
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your API keys
+uvicorn app.main:app --reload --port 8000
 ```
 
-5. Run the development server:
+### Frontend Setup
+
 ```bash
-uvicorn app.main:app --reload
+cd front
+npm install
+npm run dev
 ```
 
-The API will be available at `http://localhost:8000`
+The application will be available at `http://localhost:3000`.
 
-### API Documentation
+## 🐳 Docker Support
 
-Once the server is running:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+Run the entire stack with a single command:
 
-## Project Structure
-
-```
-backend/
-├── app/
-│   ├── api/
-│   │   └── v1/
-│   │       ├── endpoints/
-│   │       └── router.py
-│   ├── core/
-│   │   └── config.py
-│   ├── models/
-│   ├── schemas/
-│   ├── services/
-│   └── main.py
-├── tests/
-├── requirements.txt
-├── .env.example
-└── README.md
+```bash
+docker compose up --build
 ```
 
-## Development Roadmap
+## 🤝 Credits
 
-- [x] Basic FastAPI setup
-- [x] Interview session endpoints
-- [ ] Database models
-- [ ] User authentication
-- [ ] Speech-to-text integration
-- [ ] Text-to-speech integration
-- [ ] AI interview engine
-- [ ] Answer analysis and feedback
-- [ ] Frontend React app
+**Entervio** is a collaborative project built by:
 
-## License
-
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+* **[Anas Chhilif](https://github.com/AnasChhilif)** 
+* **[Jamal Eddine El Betioui](https://github.com/JamalEddineEb)**

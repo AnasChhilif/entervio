@@ -89,9 +89,16 @@ EXEMPLE DE STYLE:
 IMPORTANT: Sois exigeant mais garde des feedbacks COURTS. Ne sois pas méchant, juste direct et exigeant."""
 }
 
-def get_system_prompt(interviewer_type: InterviewerType) -> str:
+def get_system_prompt(interviewer_type: InterviewerType, candidate_context: str = "", job_description: str = "") -> str:
     """Get the complete system prompt for the given interviewer type."""
-    return f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
+    base_prompt = f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
+    
+    if job_description:
+        base_prompt += f"\n\nDESCRIPTION DU POSTE:\n{job_description}\n\nINSTRUCTION: Tu dois mener cet entretien spécifiquement pour ce poste. Tes questions doivent évaluer l'adéquation du candidat avec cette description."
+
+    if candidate_context:
+        base_prompt += f"\n\nCONTEXTE DU CANDIDAT (CV):\n{candidate_context}\n\nINSTRUCTION: Utilise ce contexte pour poser des questions personnalisées sur l'expérience et les compétences du candidat."
+    return base_prompt
 
 
 class LLMService:
@@ -103,28 +110,34 @@ class LLMService:
         api_key = settings.GEMINI_API_KEY
         
         if not api_key:
-            error_msg = (
-                "❌ GEMINI_API_KEY not found! "
-                "Please add it to your .env file: GEMINI_API_KEY=..."
+            logger.warning(
+                "⚠️  GEMINI_API_KEY not configured. "
+                "LLM features will not work. Add GEMINI_API_KEY to .env"
             )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            self.api_key = None
+            self.client_ready = False
+            return
         
         logger.info(f"✓ Found GEMINI_API_KEY: {api_key[:10]}...{api_key[-5:]}")
         
         try:
             genai.configure(api_key=api_key)
+            self.api_key = api_key
+            self.client_ready = True
             # Note: Model will be created per-session with appropriate system prompt
             logger.info("✅ Gemini client initialized successfully!")
         except Exception as e:
             logger.error(f"❌ Failed to initialize Gemini client: {str(e)}")
-            raise
+            self.client_ready = False
+            self.api_key = None
     
-    def _create_model(self, interviewer_type: InterviewerType):
+    def _create_model(self, interviewer_type: InterviewerType, candidate_context: str = "", job_description: str = ""):
         """Create a Gemini model with the appropriate system prompt."""
-        system_prompt = get_system_prompt(interviewer_type)
+        if not self.client_ready:
+            raise ValueError("Gemini client not initialized. Please set GEMINI_API_KEY in .env")
+        system_prompt = get_system_prompt(interviewer_type, candidate_context, job_description)
         return genai.GenerativeModel(
-            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash-lite-preview-02-05',
             system_instruction=system_prompt
         )
 
@@ -142,7 +155,9 @@ class LLMService:
     def get_initial_greeting(
         self, 
         candidate_name: str, 
-        interviewer_type: InterviewerType
+        interviewer_type: InterviewerType,
+        candidate_context: str = "",
+        job_description: str = ""
     ) -> str:
         """
         Generate personalized initial greeting based on interviewer type.
@@ -150,6 +165,8 @@ class LLMService:
         Args:
             candidate_name: The candidate's name
             interviewer_type: Type of interviewer (nice, neutral, mean)
+            candidate_context: Context from resume
+            job_description: Job description context
             
         Returns:
             Personalized greeting message
@@ -188,7 +205,9 @@ Présentez-vous. Et soyez synthétique."""
         self, 
         message: str, 
         conversation_history: List[Dict[str, str]],
-        interviewer_type: InterviewerType
+        interviewer_type: InterviewerType,
+        candidate_context: str = "",
+        job_description: str = ""
     ) -> str:
         """
         Send message to Gemini and get interviewer response.
@@ -197,6 +216,8 @@ Présentez-vous. Et soyez synthétique."""
             message: Candidate's message
             conversation_history: List of previous messages
             interviewer_type: Type of interviewer
+            candidate_context: Context from resume
+            job_description: Job description context
             
         Returns:
             Interviewer's response text
@@ -204,8 +225,8 @@ Présentez-vous. Et soyez synthétique."""
         logger.info(f"💬 Processing candidate response with {interviewer_type} interviewer")
         
         try:
-            # Create model with appropriate personality
-            model = self._create_model(interviewer_type)
+            # Create model with appropriate personality and context
+            model = self._create_model(interviewer_type, candidate_context, job_description)
             
             # Convert conversation history to Gemini format
             history = []
