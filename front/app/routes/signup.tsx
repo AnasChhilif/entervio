@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { authApi } from "~/lib/api";
+import { useAuth } from "~/context/AuthContext";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -15,6 +16,7 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Signup() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +31,8 @@ export default function Signup() {
 
     try {
       await authApi.signup({ name, email, password, phone: phone || undefined });
-      navigate("/login", {
+      await login({ email, password });
+      navigate("/", {
         replace: true,
       });
     } catch (err: any) {
