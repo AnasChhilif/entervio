@@ -13,7 +13,6 @@ class Interview(Base):
     __tablename__ = "interviews"
     
     id = Column(Integer, primary_key=True, index=True)
-    interviewee_name = Column(String, nullable=False)
     interviewer_style = Column(Enum(InterviewerStyle), nullable=False)
     question_count = Column(Integer, nullable=False, default=1)
     global_feedback = Column(Text, nullable=True)
