@@ -4,37 +4,62 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import tempfile
 import os
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict
 import logging
 
 from app.services.interview_service import interview_service
+from app.models.user import User
 from app.db import get_db
+from app.schemas import StartInterviewRequest
+from app.core.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-InterviewerType = Literal["nice", "neutral", "mean"]
+@router.get("/")
+async def get_interviews(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    ) -> List[Dict]:
+    """
+    Get list of interviews, optionally filtered by candidate_id.
+    
+    Args:
+        candidate_id: Optional candidate ID to filter interviews
+        db: Database session
+        interview_service: Interview service instance
+    
+    Returns:
+        List of interviews with id, candidate_id, interviewer_style, question_count, and average grade
+    """
+    supabase_id = current_user.get("sub")
+    if not supabase_id:
+        raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
 
-
-class StartInterviewRequest(BaseModel):
-    candidate_name: str
-    interviewer_type: InterviewerType
-    job_description: str | None = None
-    candidate_id: Optional[int] = None
-
+    user = db.query(User).filter(User.supabase_id == supabase_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found for Supabase ID")
+    return interview_service.get_interview_list(db, user.id)
 
 @router.post("/start")
 async def start_interview(
     request: StartInterviewRequest,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Start a new interview session."""
     try:
+        supabase_id = current_user.get("sub")
+        if not supabase_id:
+            raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
+
+        user = db.query(User).filter(User.supabase_id == supabase_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found for Supabase ID")
         result = await interview_service.start_interview(
             db=db,
-            candidate_name=request.candidate_name,
+            user=user,
             interviewer_style=request.interviewer_type,
-            candidate_id=request.candidate_id,
             job_description=request.job_description
         )
         return result

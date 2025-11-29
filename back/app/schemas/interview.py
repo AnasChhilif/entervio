@@ -21,7 +21,10 @@ class QuestionAnswer(QuestionAnswerBase):
     class Config:
         from_attributes = True
 
-# Interview schemas
+class StartInterviewRequest(BaseModel):
+    interviewer_type: InterviewerStyle
+    job_description: str | None = None
+
 class InterviewBase(BaseModel):
     interviewee_name: str
     interviewer_style: InterviewerStyle
