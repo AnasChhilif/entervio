@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = Field(default="", env="GROQ_API_KEY")
     GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
+
+    # France Travail API
+    FRANCE_TRAVAIL_CLIENT_ID: str = Field(default="", env="FRANCE_TRAVAIL_CLIENT_ID")
+    FRANCE_TRAVAIL_CLIENT_SECRET: str = Field(default="", env="FRANCE_TRAVAIL_CLIENT_SECRET")
     
     # TTS Provider Selection
     USE_ELEVENLABS: bool = Field(default=False, env="USE_ELEVENLABS")

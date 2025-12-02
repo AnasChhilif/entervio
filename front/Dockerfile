@@ -21,7 +21,7 @@ RUN echo "=== Contents of /app/build/server ===" && ls -la /app/build/server || 
 RUN echo "=== Contents of /app/build/client ===" && ls -la /app/build/client || echo "No build/client directory!"
 
 # Remove dev dependencies
-RUN npm prune --omit=dev
+# RUN npm prune --omit=dev
 
 EXPOSE 3000
 
