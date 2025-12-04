@@ -9,54 +9,78 @@ import { cn } from "~/lib/utils";
 function JobCard({ job }: { job: JobOffer }) {
     const [isOpen, setIsOpen] = useState(false);
 
+    const getApplyUrl = () => {
+        return job.urlPartner || job.contact?.urlPostulation || job.origineOffre?.urlOrigine;
+    };
+
+    const applyUrl = getApplyUrl();
+
     return (
         <div
             className={cn(
-                "group bg-card rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border border-border overflow-hidden cursor-pointer",
-                isOpen ? "ring-1 ring-primary/20" : ""
+                "group bg-card rounded-xl shadow-sm hover:shadow-[var(--shadow-diffuse)] transition-all duration-300 border border-border overflow-hidden cursor-pointer hover:-translate-y-1",
+                isOpen ? "ring-1 ring-primary/20 shadow-[var(--shadow-diffuse)]" : ""
             )}
             onClick={() => setIsOpen(!isOpen)}
         >
-            <div className="p-6 flex items-start gap-4">
+            <div className="p-6 flex items-start gap-5">
                 {/* Logo Placeholder */}
-                <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center shrink-0 text-muted-foreground">
-                    <Building2 className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-xl bg-primary/5 flex items-center justify-center shrink-0 text-primary border border-primary/10">
+                    <Building2 className="w-7 h-7" />
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start gap-4">
                         <div>
-                            <h3 className="text-lg font-serif font-bold text-foreground group-hover:text-primary transition-colors">
+                            <h3 className="text-xl font-serif font-bold text-foreground group-hover:text-primary transition-colors leading-tight">
                                 {job.intitule}
                             </h3>
-                            <p className="text-sm text-muted-foreground font-sans mt-0.5">
-                                {job.entreprise?.nom || "Company Confidential"}
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <p className="text-sm text-muted-foreground font-medium">
+                                    {job.entreprise?.nom || "Entreprise confidentielle"}
+                                </p>
+                                {job.relevance_score !== undefined && (
+                                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium text-xs">
+                                        {job.relevance_score}% Match
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                            {job.relevance_score !== undefined && (
-                                <Badge variant="secondary" className="bg-secondary text-secondary-foreground font-medium">
-                                    {job.relevance_score}% Match
-                                </Badge>
+                        <div className="flex items-center gap-3 shrink-0">
+                            {applyUrl && (
+                                <Button
+                                    asChild
+                                    size="sm"
+                                    className="rounded-full bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 hover:border-primary/30 shadow-none font-medium px-5 h-8 transition-all"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <a
+                                        href={applyUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Postuler
+                                    </a>
+                                </Button>
                             )}
-                            <Button variant="link" className="text-primary h-auto p-0 font-medium underline decoration-primary/30 hover:decoration-primary">
-                                View
+                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary rounded-lg">
+                                {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                             </Button>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1.5 bg-secondary/30 px-2.5 py-1 rounded-md border border-secondary/50">
                             <MapPin className="w-3.5 h-3.5" />
                             <span>{job.lieuTravail.libelle}</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 bg-secondary/30 px-2.5 py-1 rounded-md border border-secondary/50">
                             <Briefcase className="w-3.5 h-3.5" />
                             <span>{job.typeContrat}</span>
                         </div>
                         {job.salaire?.libelle && (
-                            <Badge variant="outline" className="text-xs font-normal text-muted-foreground border-border">
+                            <Badge variant="outline" className="text-xs font-normal text-muted-foreground border-border bg-background">
                                 {job.salaire.libelle}
                             </Badge>
                         )}
@@ -66,35 +90,35 @@ function JobCard({ job }: { job: JobOffer }) {
 
             {/* Expanded Details */}
             {isOpen && (
-                <div className="px-6 pb-6 pt-0 animate-in slide-in-from-top-2 duration-200">
-                    <div className="h-px w-full bg-border mb-4" />
+                <div className="px-6 pb-6 pt-0 animate-in slide-in-from-top-2 duration-300">
+                    <div className="h-px w-full bg-border/50 mb-6" />
 
                     {job.relevance_reasoning && (
-                        <div className="mb-4 p-3 bg-secondary/30 rounded-md border border-secondary/50">
-                            <div className="flex items-center gap-2 text-sm font-medium text-secondary-foreground mb-1">
-                                <Sparkles className="w-3.5 h-3.5" />
-                                <span>AI Analysis</span>
+                        <div className="mb-6 p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                            <div className="flex items-center gap-2 text-sm font-bold text-emerald-800 mb-2">
+                                <Sparkles className="w-4 h-4 text-emerald-600" />
+                                <span>Analyse IA</span>
                             </div>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-emerald-900/80 leading-relaxed">
                                 {job.relevance_reasoning}
                             </p>
                         </div>
                     )}
 
-                    <div className="prose prose-sm max-w-none text-muted-foreground">
+                    <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
                         <p className="whitespace-pre-line">{job.description}</p>
                     </div>
 
-                    <div className="mt-6 flex justify-end">
-                        {job.urlPartner && (
-                            <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm">
+                    <div className="mt-8 flex justify-end pt-4 border-t border-border/50">
+                        {applyUrl && (
+                            <Button asChild size="lg" className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-8">
                                 <a
-                                    href={job.urlPartner}
+                                    href={applyUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    Apply Now <ExternalLink className="w-4 h-4 ml-2" />
+                                    Postuler maintenant <ExternalLink className="w-4 h-4 ml-2" />
                                 </a>
                             </Button>
                         )}
@@ -153,33 +177,33 @@ export default function JobsSearch() {
             <div className="w-full max-w-[800px] space-y-8">
 
                 {/* Header */}
-                <div className="text-center space-y-2">
-                    <h1 className="text-4xl font-serif font-medium text-foreground">
-                        The Opportunity Deck
+                <div className="text-center space-y-4 mb-8">
+                    <h1 className="text-5xl font-serif font-medium text-foreground tracking-tight">
+                        Opportunités
                     </h1>
-                    <p className="text-muted-foreground">
-                        Find roles that match your true potential.
+                    <p className="text-lg text-muted-foreground font-light max-w-2xl mx-auto">
+                        Découvrez les offres qui correspondent à votre véritable potentiel.
                     </p>
                 </div>
 
                 {/* Search Bar */}
-                <div className="bg-card p-2 rounded-lg shadow-sm border border-border flex flex-col sm:flex-row gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <div className="bg-background/60 backdrop-blur-xl p-2 rounded-2xl shadow-[var(--shadow-diffuse)] border border-border/40 flex flex-col sm:flex-row gap-2 relative z-10">
+                    <div className="relative flex-1 group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <Input
-                            placeholder="Search role or company..."
-                            className="pl-12 h-12 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent"
+                            placeholder="Poste, entreprise, mot-clé..."
+                            className="pl-12 h-14 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent rounded-xl"
                             value={keywords}
                             onChange={(e) => setKeywords(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                         />
                     </div>
-                    <div className="h-px sm:h-auto sm:w-px bg-border mx-2" />
-                    <div className="relative w-full sm:w-1/3">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <div className="h-px sm:h-auto sm:w-px bg-border/50 mx-2" />
+                    <div className="relative w-full sm:w-1/3 group">
+                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <Input
-                            placeholder="Location"
-                            className="pl-12 h-12 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent"
+                            placeholder="Lieu (ex: Paris)"
+                            className="pl-12 h-14 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent rounded-xl"
                             value={location}
                             onChange={(e) => setLocation(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -188,9 +212,9 @@ export default function JobsSearch() {
                     <Button
                         onClick={(e) => handleSearch(e)}
                         disabled={isLoading}
-                        className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium"
+                        className="h-14 px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium text-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]"
                     >
-                        {isLoading && searchMode === "standard" ? "Searching..." : "Search"}
+                        {isLoading && searchMode === "standard" ? "Recherche..." : "Rechercher"}
                     </Button>
                 </div>
 
@@ -202,12 +226,12 @@ export default function JobsSearch() {
                         onClick={handleSmartSearch}
                         disabled={isLoading}
                         className={cn(
-                            "gap-2 border-primary/20 hover:bg-secondary/50 hover:text-primary transition-colors",
-                            searchMode === "smart" && hasSearched ? "bg-secondary/50 text-primary border-primary/50" : "text-muted-foreground"
+                            "gap-2 h-12 px-6 rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary transition-all duration-300 hover:border-primary/50",
+                            searchMode === "smart" && hasSearched ? "bg-primary/10 text-primary border-primary/50 shadow-inner" : "text-muted-foreground bg-background/50"
                         )}
                     >
                         <Sparkles className={cn("w-4 h-4", isLoading && searchMode === "smart" ? "animate-spin" : "")} />
-                        {isLoading && searchMode === "smart" ? "Analyzing Profile..." : "Use Smart Search (AI)"}
+                        {isLoading && searchMode === "smart" ? "Analyse du profil..." : "Recherche Intelligente (IA)"}
                     </Button>
                 </div>
 

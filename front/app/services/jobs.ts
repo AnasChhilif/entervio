@@ -18,6 +18,12 @@ export interface JobOffer {
     urlPartner?: string;
     relevance_score?: number;
     relevance_reasoning?: string;
+    origineOffre?: {
+        urlOrigine?: string;
+    };
+    contact?: {
+        urlPostulation?: string;
+    };
 }
 
 export const jobsService = {
