@@ -29,12 +29,10 @@ async def upload_resume(
         file_stream = io.BytesIO(file_content)
         
         raw_text = resume_service_instance.extract_text_from_stream(file_stream)
-        print(raw_text," hh")
         if not raw_text:
              raise HTTPException(status_code=400, detail="Could not extract text from PDF")
              
         parsed_data = resume_service_instance.extract_data_with_llm(raw_text)
-        print(parsed_data," hh")
         
         if "error" in parsed_data:
              raise HTTPException(status_code=500, detail=parsed_data["error"])
