@@ -1,76 +1,62 @@
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link } from "react-router";
+import { User, Briefcase, Mic, LogOut } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { cn } from "~/lib/utils";
-import { MessageSquare } from "lucide-react";
 import { useAuth } from "~/context/AuthContext";
 
 export function Navbar() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+    const { user, logout } = useAuth();
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
+    return (
+        <nav className="border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-50">
+            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+                <div className="flex items-center gap-8">
+                    <Link to="/" className="flex items-center gap-2 font-bold text-xl text-primary hover:opacity-80 transition-opacity">
+                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
+                            E
+                        </div>
+                        Entervio
+                    </Link>
 
-  return (
-    <nav className="border-b border-border bg-background/95 backdrop-blur-md sticky top-0 z-50">
-      <div className="container mx-auto px-6">
-        <div className="flex items-center justify-between h-20">
-          <Link
-            to="/"
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
-          >
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-              <MessageSquare className="w-6 h-6 text-primary" />
+                    <div className="hidden md:flex items-center gap-6">
+                        <Link to="/setup" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+                            <Mic className="w-4 h-4" />
+                            S'entraîner
+                        </Link>
+                        <Link to="/interviews" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+                            <Briefcase className="w-4 h-4" />
+                            Mes entretiens
+                        </Link>
+                        <Link to="/jobs" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+                            <Briefcase className="w-4 h-4" />
+                            Offres
+                        </Link>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {user ? (
+                        <>
+                            <Button asChild variant="ghost" size="icon" className="rounded-full">
+                                <Link to="/account">
+                                    <User className="w-5 h-5" />
+                                </Link>
+                            </Button>
+                            <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-destructive" onClick={() => logout()}>
+                                <LogOut className="w-5 h-5" />
+                            </Button>
+                        </>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <Button asChild variant="ghost" size="sm">
+                                <Link to="/login">Connexion</Link>
+                            </Button>
+                            <Button asChild size="sm">
+                                <Link to="/signup">Inscription</Link>
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </div>
-            <span className="text-2xl font-bold text-foreground tracking-tight">
-              Entervio
-            </span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Button
-              asChild
-              variant={isActive("/interviews") ? "secondary" : "ghost"}
-              size="default"
-              className={cn(
-                "font-medium",
-                isActive("/interviews") && "bg-secondary text-secondary-foreground"
-              )}
-            >
-              <Link to="/interviews">Mes entretiens</Link>
-            </Button>
-            <Button
-              asChild
-              variant={isActive("/account") ? "secondary" : "ghost"}
-              size="default"
-              className={cn(
-                "font-medium",
-                isActive("/account") && "bg-secondary text-secondary-foreground"
-              )}
-            >
-              <Link to="/account">Mon compte</Link>
-            </Button>
-            {user ? (
-              <Button
-                variant="outline"
-                size="default"
-                type="button"
-                onClick={async () => {
-                  await logout();
-                  navigate("/login");
-                }}
-              >
-                Déconnexion
-              </Button>
-            ) : (
-              <Button asChild size="default" variant="default">
-                <Link to="/login">Connexion</Link>
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    </nav>
-  );
+        </nav>
+    );
 }

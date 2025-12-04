@@ -331,6 +331,89 @@ export const interviewApi = {
 
     return response.json();
   },
+
+  /**
+   * Get job statistics from France Travail
+   */
+  async getJobStats(codeRome?: string, codeGeographique?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (codeRome) params.append("code_rome", codeRome);
+    if (codeGeographique) params.append("code_geographique", codeGeographique);
+
+    const response = await fetch(
+      `${API_BASE_URL}/jobs/stats?${params.toString()}`,
+      withAuthHeaders(),
+    );
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Failed to get job stats: ${response.status}`
+      );
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Search jobs from France Travail
+   */
+  async searchJobs(keywords?: string, location?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (keywords) params.append("keywords", keywords);
+    if (location) params.append("location", location);
+
+    const response = await fetch(
+      `${API_BASE_URL}/jobs/search?${params.toString()}`,
+      withAuthHeaders(),
+    );
+
+    return response.json();
+  },
+
+  /**
+   * Perform smart job search based on user resume
+   */
+  async smartSearchJobs(): Promise<any> {
+    const response = await fetch(
+      `${API_BASE_URL}/jobs/smart-search`,
+      withAuthHeaders({
+        method: "POST",
+      })
+    );
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Failed to perform smart search: ${response.status}`
+      );
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get access to employment stats
+   */
+  async getAccessStats(codeRome?: string, codeGeographique?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (codeRome) params.append("code_rome", codeRome);
+    if (codeGeographique) params.append("code_geographique", codeGeographique);
+
+    const response = await fetch(
+      `${API_BASE_URL}/jobs/access-stats?${params.toString()}`,
+      withAuthHeaders(),
+    );
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Failed to fetch access stats: ${response.status}`
+      );
+    }
+
+    return response.json();
+  },
 };
 
 export const authApi = {

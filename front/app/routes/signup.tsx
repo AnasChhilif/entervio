@@ -7,7 +7,7 @@ import { Input } from "~/components/ui/input";
 import { authApi } from "~/lib/api";
 import { useAuth } from "~/context/AuthContext";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Créer un compte - Entervio" },
     { name: "description", content: "Créez votre compte Entervio" },
@@ -43,40 +43,47 @@ export default function Signup() {
   };
 
   return (
-    <div className="container mx-auto px-6 py-16 max-w-md">
-      <Card className="border-2 shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">Créer un compte</CardTitle>
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
+      <Card className="w-full max-w-md border-border bg-card/50 backdrop-blur-sm shadow-2xl shadow-primary/5">
+        <CardHeader className="space-y-1 text-center pb-8">
+          <CardTitle className="text-3xl font-bold tracking-tight">Créer un compte</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Rejoignez Entervio pour commencer votre entraînement
+          </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="name">
-                Nom
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="name">
+                Nom complet
               </label>
               <Input
                 id="name"
+                placeholder="Jean Dupont"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoComplete="name"
+                className="bg-background/50 border-input hover:border-primary/50 transition-colors"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="email">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
                 Email
               </label>
               <Input
                 id="email"
                 type="email"
+                placeholder="nom@exemple.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
+                className="bg-background/50 border-input hover:border-primary/50 transition-colors"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="password">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
                 Mot de passe
               </label>
               <Input
@@ -86,33 +93,48 @@ export default function Signup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
+                className="bg-background/50 border-input hover:border-primary/50 transition-colors"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="phone">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="phone">
                 Téléphone (optionnel)
               </label>
               <Input
                 id="phone"
+                placeholder="+33 6 12 34 56 78"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 autoComplete="tel"
+                className="bg-background/50 border-input hover:border-primary/50 transition-colors"
               />
             </div>
             {error && (
-              <p className="text-sm text-red-500" aria-live="polite">
+              <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm font-medium text-center border border-destructive/20">
                 {error}
-              </p>
+              </div>
             )}
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="w-full h-11 text-base shadow-lg shadow-primary/20" disabled={submitting}>
               {submitting ? "Création du compte..." : "Créer mon compte"}
             </Button>
-            <p className="text-xs text-muted-foreground text-center mt-4">
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Ou
+                </span>
+              </div>
+            </div>
+
+            <div className="text-center text-sm text-muted-foreground">
               Vous avez déjà un compte ?{" "}
-              <Link to="/login" className="underline">
+              <Link to="/login" className="text-primary hover:text-primary/80 font-semibold transition-colors hover:underline">
                 Se connecter
               </Link>
-            </p>
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -29,7 +29,9 @@ services:
     environment:
       - DATABASE_URL=postgresql+psycopg://entervio_user:${POSTGRES_PASSWORD:-change_this_password}@postgres:5432/entervio
     volumes:
+      - ./back:/app
       - ./back/data:/app/data
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,6 +44,10 @@ services:
       context: ./front
       dockerfile: Dockerfile
     container_name: entervio-frontend
+    volumes:
+      - ./front:/app
+      - /app/node_modules
+    command: npm run dev -- --host
     depends_on:
       - backend
     restart: unless-stopped
