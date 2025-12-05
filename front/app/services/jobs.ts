@@ -42,4 +42,24 @@ export const jobsService = {
         const response = await api.get(`/jobs/smart-search?${params.toString()}`);
         return response.data;
     },
+
+    searchLocations: async (query: string): Promise<City[]> => {
+        const params = new URLSearchParams({ query });
+        const response = await api.get(`/jobs/locations?${params.toString()}`);
+        return response.data;
+    },
 };
+
+export interface City {
+    nom: string;
+    code: string;
+    codesPostaux: string[];
+    departement?: {
+        code: string;
+        nom: string;
+    };
+    region?: {
+        code: string;
+        nom: string;
+    };
+}

@@ -5,6 +5,7 @@ import { Search, MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDo
 import { jobsService, type JobOffer } from "~/services/jobs";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
+import { CityAutocomplete } from "~/components/jobs/CityAutocomplete";
 
 function JobCard({ job }: { job: JobOffer }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -131,7 +132,7 @@ function JobCard({ job }: { job: JobOffer }) {
 
 export default function JobsSearch() {
     const [keywords, setKeywords] = useState("");
-    const [location, setLocation] = useState("");
+    const [selectedCity, setSelectedCity] = useState<{ nom: string; code: string } | null>(null);
     const [jobs, setJobs] = useState<JobOffer[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
@@ -144,7 +145,10 @@ export default function JobsSearch() {
         setIsLoading(true);
         setJobs([]); // Clear previous results
         try {
-            const results = await jobsService.search(keywords, location);
+            // Use city code if selected, otherwise nothing (or maybe name if we want to support loose search?)
+            // France Travail API prefers code for "commune" parameter.
+            const locationParam = selectedCity ? selectedCity.code : undefined;
+            const results = await jobsService.search(keywords, locationParam);
             setJobs(results);
             setSearchMode("standard");
         } catch (error) {
@@ -159,8 +163,8 @@ export default function JobsSearch() {
         setIsLoading(true);
         setJobs([]); // Clear previous results
         try {
-            // Smart search doesn't strictly require keywords as it uses the resume
-            const results = await jobsService.smartSearch(location);
+            const locationParam = selectedCity ? selectedCity.code : undefined;
+            const results = await jobsService.smartSearch(locationParam);
             setJobs(results);
             setSearchMode("smart");
         } catch (error) {
@@ -200,13 +204,9 @@ export default function JobsSearch() {
                     </div>
                     <div className="h-px sm:h-auto sm:w-px bg-border/50 mx-2" />
                     <div className="relative w-full sm:w-1/3 group">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <Input
-                            placeholder="Lieu (ex: Paris)"
-                            className="pl-12 h-14 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent rounded-xl"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                        <CityAutocomplete
+                            onSelect={(city) => setSelectedCity(city)}
+                            selectedCityCode={selectedCity?.code}
                         />
                     </div>
                     <Button

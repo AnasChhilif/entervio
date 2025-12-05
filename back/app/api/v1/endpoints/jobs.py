@@ -36,3 +36,14 @@ async def smart_search_jobs(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/locations", response_model=List[Dict])
+async def search_locations(
+    query: str = Query(..., min_length=2),
+    current_user: User = Depends(get_current_db_user)
+):
+    """
+    Search for cities (communes) in France.
+    """
+    from app.services.location_service import location_service
+    return await location_service.search_cities(query)
+

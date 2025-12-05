@@ -42,7 +42,14 @@ class FranceTravailService:
             "range": "0-49" # Limit to 50 results
         }
         if location:
-            params["commune"] = location # Note: This requires INSEE code, might need adjustment
+            if location == "75056":
+                # Special case for Paris: use department 75
+                params["departement"] = "75"
+            else:
+                params["commune"] = location
+                params["distance"] = 10 # Default to 10km radius
+        
+        print(f"DEBUG: Searching France Travail with params: {params}")
 
         async with httpx.AsyncClient() as client:
             response = await client.get(
