@@ -1,11 +1,63 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Search, MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
-import { CityAutocomplete } from "~/components/jobs/CityAutocomplete";
+
+function useTypewriter(phrases: string[], typingSpeed = 50, deletingSpeed = 30, pauseDuration = 2000) {
+    const [text, setText] = useState("");
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [loopNum, setLoopNum] = useState(0);
+    const [typingSpeedState, setTypingSpeedState] = useState(typingSpeed);
+
+    useEffect(() => {
+        const handleTyping = () => {
+            const i = loopNum % phrases.length;
+            const fullText = phrases[i];
+
+            setText(isDeleting
+                ? fullText.substring(0, text.length - 1)
+                : fullText.substring(0, text.length + 1)
+            );
+
+            setTypingSpeedState(isDeleting ? deletingSpeed : typingSpeed);
+
+            if (!isDeleting && text === fullText) {
+                setTimeout(() => setIsDeleting(true), pauseDuration);
+            } else if (isDeleting && text === "") {
+                setIsDeleting(false);
+                setLoopNum(loopNum + 1);
+            }
+        };
+
+        const timer = setTimeout(handleTyping, typingSpeedState);
+        return () => clearTimeout(timer);
+    }, [text, isDeleting, loopNum, phrases, typingSpeed, deletingSpeed, pauseDuration, typingSpeedState]);
+
+    return text;
+}
+
+function formatSalary(salary: string): string {
+    // Example: "Annuel de 35000.0 Euros à 39000.0 Euros sur 12.0 mois"
+    try {
+        // Extract numbers
+        const matches = salary.match(/(\d+)\.0/g);
+        if (matches && matches.length >= 2) {
+            const min = parseInt(matches[0]);
+            const max = parseInt(matches[1]);
+
+            const formatK = (n: number) => `${Math.round(n / 1000)}k€`;
+
+            if (salary.toLowerCase().includes("annuel")) {
+                return `${formatK(min)} - ${formatK(max)} / an`;
+            }
+        }
+        return salary;
+    } catch (e) {
+        return salary;
+    }
+}
 
 function JobCard({ job }: { job: JobOffer }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -22,7 +74,12 @@ function JobCard({ job }: { job: JobOffer }) {
                 "group bg-card rounded-xl shadow-sm hover:shadow-[var(--shadow-diffuse)] transition-all duration-300 border border-border overflow-hidden cursor-pointer hover:-translate-y-1",
                 isOpen ? "ring-1 ring-primary/20 shadow-[var(--shadow-diffuse)]" : ""
             )}
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => {
+                const selection = window.getSelection();
+                if (!selection || selection.toString().length === 0) {
+                    setIsOpen(!isOpen);
+                }
+            }}
         >
             <div className="p-6 flex items-start gap-5">
                 {/* Logo Placeholder */}
@@ -82,7 +139,7 @@ function JobCard({ job }: { job: JobOffer }) {
                         </div>
                         {job.salaire?.libelle && (
                             <Badge variant="outline" className="text-xs font-normal text-muted-foreground border-border bg-background">
-                                {job.salaire.libelle}
+                                {formatSalary(job.salaire.libelle)}
                             </Badge>
                         )}
                     </div>
@@ -101,7 +158,7 @@ function JobCard({ job }: { job: JobOffer }) {
                                 <span>Analyse IA</span>
                             </div>
                             <p className="text-sm text-emerald-900/80 leading-relaxed">
-                                {job.relevance_reasoning}
+                                Recommandé pour vous
                             </p>
                         </div>
                     )}
@@ -131,42 +188,26 @@ function JobCard({ job }: { job: JobOffer }) {
 }
 
 export default function JobsSearch() {
-    const [keywords, setKeywords] = useState("");
-    const [selectedCity, setSelectedCity] = useState<{ nom: string; code: string } | null>(null);
+    const [nlQuery, setNlQuery] = useState("");
     const [jobs, setJobs] = useState<JobOffer[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
-    const [searchMode, setSearchMode] = useState<"standard" | "smart">("standard");
 
-    const handleSearch = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        if (!keywords.trim() && searchMode === "standard") return;
-
-        setIsLoading(true);
-        setJobs([]); // Clear previous results
-        try {
-            // Use city code if selected, otherwise nothing (or maybe name if we want to support loose search?)
-            // France Travail API prefers code for "commune" parameter.
-            const locationParam = selectedCity ? selectedCity.code : undefined;
-            const results = await jobsService.search(keywords, locationParam);
-            setJobs(results);
-            setSearchMode("standard");
-        } catch (error) {
-            console.error("Search failed:", error);
-        } finally {
-            setIsLoading(false);
-            setHasSearched(true);
-        }
-    };
+    const typewriterText = useTypewriter([
+        "Trouve-moi un poste React en remote > 80k€...",
+        "Montre-moi des jobs de PM Senior dans la Climate Tech...",
+        "Designer Junior avec sponsor visa..."
+    ]);
 
     const handleSmartSearch = async () => {
+        // Allow empty query (uses profile)
+        // if (!nlQuery.trim()) return;
+
         setIsLoading(true);
         setJobs([]); // Clear previous results
         try {
-            const locationParam = selectedCity ? selectedCity.code : undefined;
-            const results = await jobsService.smartSearch(locationParam);
+            const results = await jobsService.smartSearch(undefined, nlQuery);
             setJobs(results);
-            setSearchMode("smart");
         } catch (error) {
             console.error("Smart search failed:", error);
         } finally {
@@ -175,8 +216,15 @@ export default function JobsSearch() {
         }
     };
 
+    const quickChips = [
+        "100% Télétravail",
+        "Salaire > 60k",
+        "Startups",
+        "Python"
+    ];
+
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center py-12 px-4">
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4">
             {/* Main Column */}
             <div className="w-full max-w-[800px] space-y-8">
 
@@ -186,53 +234,55 @@ export default function JobsSearch() {
                         Opportunités
                     </h1>
                     <p className="text-lg text-muted-foreground font-light max-w-2xl mx-auto">
-                        Découvrez les offres qui correspondent à votre véritable potentiel.
+                        Décrivez votre job idéal, ou laissez vide pour une recherche basée sur votre profil.
                     </p>
                 </div>
 
-                {/* Search Bar */}
-                <div className="bg-background/60 backdrop-blur-xl p-2 rounded-2xl shadow-[var(--shadow-diffuse)] border border-border/40 flex flex-col sm:flex-row gap-2 relative z-10">
-                    <div className="relative flex-1 group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <Input
-                            placeholder="Poste, entreprise, mot-clé..."
-                            className="pl-12 h-14 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent rounded-xl"
-                            value={keywords}
-                            onChange={(e) => setKeywords(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        />
-                    </div>
-                    <div className="h-px sm:h-auto sm:w-px bg-border/50 mx-2" />
-                    <div className="relative w-full sm:w-1/3 group">
-                        <CityAutocomplete
-                            onSelect={(city) => setSelectedCity(city)}
-                            selectedCityCode={selectedCity?.code}
-                        />
-                    </div>
-                    <Button
-                        onClick={(e) => handleSearch(e)}
-                        disabled={isLoading}
-                        className="h-14 px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium text-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]"
-                    >
-                        {isLoading && searchMode === "standard" ? "Recherche..." : "Rechercher"}
-                    </Button>
-                </div>
+                {/* Search Interface (Command Bar) */}
+                <div className="relative w-full max-w-2xl mx-auto group z-20">
 
-                {/* Smart Search Toggle */}
-                <div className="flex justify-center">
-                    <Button
-                        variant="outline"
-                        size="lg"
-                        onClick={handleSmartSearch}
-                        disabled={isLoading}
-                        className={cn(
-                            "gap-2 h-12 px-6 rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary transition-all duration-300 hover:border-primary/50",
-                            searchMode === "smart" && hasSearched ? "bg-primary/10 text-primary border-primary/50 shadow-inner" : "text-muted-foreground bg-background/50"
-                        )}
-                    >
-                        <Sparkles className={cn("w-4 h-4", isLoading && searchMode === "smart" ? "animate-spin" : "")} />
-                        {isLoading && searchMode === "smart" ? "Analyse du profil..." : "Recherche Intelligente (IA)"}
-                    </Button>
+                    <div className="relative flex items-center w-full bg-white rounded-2xl shadow-[0px_12px_24px_-8px_rgba(0,0,0,0.08)] h-16 px-4 border border-gray-100 focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/5 transition-all duration-300">
+
+                        {/* Left Icon */}
+                        <Sparkles className="w-6 h-6 text-gray-400 mr-4 shrink-0" />
+
+                        {/* Input */}
+                        <input
+                            className="w-full h-full bg-transparent border-0 focus:ring-0 text-lg text-gray-800 placeholder:text-gray-400 outline-none"
+                            placeholder="Décrivez votre job idéal ou laissez vide pour utiliser votre profil..."
+                            value={nlQuery}
+                            onChange={(e) => setNlQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSmartSearch()}
+                        />
+
+                        {/* Right Action (Black Pearl) */}
+                        <div className="flex items-center ml-4 shrink-0">
+                            <button
+                                onClick={handleSmartSearch}
+                                disabled={isLoading}
+                                className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <ArrowRight className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Quick Chips */}
+                    <div className="flex items-center gap-2 mt-4 justify-center flex-wrap">
+                        {quickChips.map((chip) => (
+                            <button
+                                key={chip}
+                                onClick={() => setNlQuery(chip)}
+                                className="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-xs font-medium text-gray-600 transition-colors border border-gray-200"
+                            >
+                                {chip}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Results */}
@@ -242,20 +292,20 @@ export default function JobsSearch() {
                             <JobCard key={job.id} job={job} />
                         ))
                     ) : hasSearched && !isLoading ? (
-                        <div className="text-center py-16 bg-card rounded-lg border border-border border-dashed">
-                            <p className="text-muted-foreground">No opportunities found. Try adjusting your search.</p>
+                        <div className="text-center py-16 bg-card rounded-2xl border border-border border-dashed">
+                            <p className="text-muted-foreground">Aucune opportunité trouvée. Essayez de reformuler votre recherche.</p>
                         </div>
                     ) : !hasSearched && !isLoading ? (
                         <div className="text-center py-16">
                             <p className="text-muted-foreground text-sm">
-                                Enter a keyword or use Smart Search to find jobs tailored to your resume.
+                                Utilisez la recherche intelligente pour trouver des offres sur mesure.
                             </p>
                         </div>
                     ) : (
                         // Loading State Skeletons
                         <div className="space-y-4">
                             {[1, 2, 3].map((i) => (
-                                <div key={i} className="h-32 bg-card rounded-lg border border-border animate-pulse" />
+                                <div key={i} className="h-32 bg-card rounded-xl border border-border animate-pulse" />
                             ))}
                         </div>
                     )}

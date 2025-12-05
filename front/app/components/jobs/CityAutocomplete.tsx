@@ -7,9 +7,11 @@ import { jobsService, type City } from "~/services/jobs";
 export function CityAutocomplete({
     onSelect,
     selectedCityCode,
+    className,
 }: {
     onSelect: (city: City | null) => void;
     selectedCityCode?: string;
+    className?: string;
 }) {
     const [value, setValue] = React.useState("");
     const [cities, setCities] = React.useState<City[]>([]);
@@ -95,7 +97,7 @@ export function CityAutocomplete({
     };
 
     return (
-        <div className="relative w-full" ref={wrapperRef}>
+        <div className={cn("relative w-full", className)} ref={wrapperRef}>
             <div className="relative group">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input

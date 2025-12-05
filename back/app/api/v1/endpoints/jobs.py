@@ -9,7 +9,7 @@ router = APIRouter()
 
 @router.get("/search", response_model=List[Dict])
 async def search_jobs(
-    keywords: str = Query(..., min_length=2),
+    keywords: Optional[str] = None,
     location: Optional[str] = None,
     current_user: User = Depends(get_current_db_user)
 ):
@@ -25,13 +25,14 @@ async def search_jobs(
 @router.get("/smart-search", response_model=List[Dict])
 async def smart_search_jobs(
     location: Optional[str] = None,
+    query: Optional[str] = None,
     current_user: User = Depends(get_current_db_user)
 ):
     """
-    Perform a smart search based on the user's resume.
+    Perform a smart search based on the user's resume and optional query.
     """
     try:
-        jobs = await smart_job_service.smart_search(current_user, location)
+        jobs = await smart_job_service.smart_search(current_user, location, query)
         return jobs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

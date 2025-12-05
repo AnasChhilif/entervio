@@ -42,8 +42,12 @@ class FranceTravailService:
             "range": "0-49" # Limit to 50 results
         }
         if location:
-            if location == "75056":
-                # Special case for Paris: use department 75
+            # If location is a zip code or INSEE code (5 digits), use it directly
+            # Otherwise, we assume it's a code passed from SmartJobService
+            # The caller (SmartJobService) is responsible for resolving names to codes.
+            
+            if location == "75056" or location.startswith("75"):
+                # Special case for Paris: use department 75 if it's Paris
                 params["departement"] = "75"
             else:
                 params["commune"] = location
