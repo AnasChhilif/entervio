@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/_index";
 import { Button } from "~/components/ui/button";
@@ -10,14 +11,16 @@ import {
 } from "~/components/ui/card";
 import {
   ArrowRight,
-  CheckCircle2,
   Mic,
   Users,
-  Archive,
   BarChart3,
   Lock,
   Play,
+  Star,
+  Calendar,
 } from "lucide-react";
+import { authApi, interviewApi, type Interview } from "~/lib/api";
+import { cn } from "~/lib/utils";
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -29,7 +32,60 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
+const INTERVIEWER_STYLE_LABELS: Record<string, string> = {
+  nice: "Le Mentor",
+  neutral: "Le Professionnel",
+  mean: "L'Exigeant",
+};
+
 export default function Home() {
+  const [user, setUser] = useState<{ name: string } | null>(null);
+  const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [userData, interviewsData] = await Promise.all([
+          authApi.getMe().catch(() => null),
+          interviewApi.getInterviews().catch(() => []),
+        ]);
+        setUser(userData);
+        setInterviews(interviewsData);
+      } catch (error) {
+        console.error("Failed to load dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Calculate stats
+  const totalSimulations = interviews.length;
+  const uniqueStyles = Object.keys(INTERVIEWER_STYLE_LABELS).length;
+
+  // Get last session
+  const lastSession = interviews.length > 0
+    ? [...interviews].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+    : null;
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.abs(now.getTime() - date.getTime()) / 36e5;
+
+    if (diffInHours < 24) {
+      if (diffInHours < 1) return "Il y a moins d'une heure";
+      return `Il y a ${Math.floor(diffInHours)} heures`;
+    }
+
+    return new Intl.DateTimeFormat("fr-FR", {
+      day: "numeric",
+      month: "long",
+    }).format(date);
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-secondary selection:text-secondary-foreground">
       {/* Navbar Placeholder (Assuming Layout handles it, but visually we want it clean) */}
@@ -44,8 +100,17 @@ export default function Home() {
             </div>
 
             <h1 className="text-6xl md:text-7xl lg:text-8xl font-serif font-medium tracking-tight leading-[0.95] text-primary">
-              Maîtrisez <br />
-              votre voix.
+              {user ? (
+                <>
+                  Bonjour <br />
+                  {user.name}
+                </>
+              ) : (
+                <>
+                  Maîtrisez <br />
+                  votre voix.
+                </>
+              )}
             </h1>
 
             <p className="text-xl md:text-2xl text-muted-foreground max-w-xl leading-relaxed font-light">
@@ -90,13 +155,34 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
                     <Mic className="w-8 h-8" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Dernière Session</p>
-                    <h3 className="text-2xl font-serif font-medium text-foreground mt-1">Fullstack Engineer</h3>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="px-2 py-0.5 rounded-md bg-green-100 text-green-700 text-sm font-medium">Score: 8.5/10</span>
-                      <span className="text-sm text-muted-foreground">Il y a 2 heures</span>
-                    </div>
+                    {loading ? (
+                      <div className="h-8 w-32 bg-muted rounded animate-pulse mt-1" />
+                    ) : lastSession ? (
+                      <>
+                        <h3 className="text-2xl font-serif font-medium text-foreground mt-1">
+                          {INTERVIEWER_STYLE_LABELS[lastSession.interviewer_style] || lastSession.interviewer_style}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-md text-sm font-medium flex items-center gap-1",
+                            lastSession.grade >= 8 ? "bg-green-100 text-green-700" :
+                              lastSession.grade >= 5 ? "bg-amber-100 text-amber-700" :
+                                "bg-red-100 text-red-700"
+                          )}>
+                            <Star className="w-3 h-3 fill-current" />
+                            Score: {lastSession.grade.toFixed(1)}/10
+                          </span>
+                          <span className="text-sm text-muted-foreground">{formatDate(lastSession.created_at)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-1">
+                        <h3 className="text-xl font-serif font-medium text-foreground">Aucune session</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Commencez votre première simulation</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -108,8 +194,12 @@ export default function Home() {
                     <div className="mb-4 w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center text-secondary-foreground">
                       <Users className="w-5 h-5" />
                     </div>
-                    <h4 className="text-3xl font-bold text-foreground">3</h4>
-                    <p className="text-sm text-muted-foreground mt-1">Styles de Recruteur</p>
+                    {loading ? (
+                      <div className="h-9 w-12 bg-muted rounded animate-pulse" />
+                    ) : (
+                      <h4 className="text-3xl font-bold text-foreground">{uniqueStyles}</h4>
+                    )}
+                    <p className="text-sm text-muted-foreground mt-1">Styles Disponibles</p>
                   </CardContent>
                 </Card>
                 <Card className="border-border shadow-sm bg-white hover:shadow-md transition-shadow">
@@ -117,7 +207,11 @@ export default function Home() {
                     <div className="mb-4 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                       <BarChart3 className="w-5 h-5" />
                     </div>
-                    <h4 className="text-3xl font-bold text-foreground">12</h4>
+                    {loading ? (
+                      <div className="h-9 w-12 bg-muted rounded animate-pulse" />
+                    ) : (
+                      <h4 className="text-3xl font-bold text-foreground">{totalSimulations}</h4>
+                    )}
                     <p className="text-sm text-muted-foreground mt-1">Simulations Complétées</p>
                   </CardContent>
                 </Card>

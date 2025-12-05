@@ -321,21 +321,22 @@ Présentez-vous. Et soyez synthétique."""
         self, 
         conversation_history: List[Dict[str, str]],
         interviewer_type: InterviewerType
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
-        Generate feedback and analysis for the interview.
+        Generate structured feedback and analysis for the interview.
         
         Args:
             conversation_history: Full conversation history
             interviewer_type: Type of interviewer
             
         Returns:
-            Structured feedback and analysis of the interview performance
+            Dict containing structured feedback (score, strengths, weaknesses, tips, overall_comment)
         """
-        logger.info(f"📝 Generating interview feedback with {interviewer_type} interviewer...")
+        logger.info(f"📝 Generating structured interview feedback with {interviewer_type} interviewer...")
         
         try:
-            model = self._create_model(interviewer_type)
+            # Create model with JSON output configuration
+            model = self._create_grading_model(interviewer_type)
             
             history = []
             for msg in conversation_history:
@@ -345,54 +346,61 @@ Présentez-vous. Et soyez synthétique."""
                     "parts": [msg["content"]]
                 })
             
+            # We don't use chat history directly for generation to avoid context limit issues or confusion,
+            # but we construct a prompt that includes the conversation transcript if needed.
+            # However, Gemini's chat mode is best. Let's stick to chat but with a specific final prompt.
+            # Actually, for JSON output, it's safer to use generate_content with the full transcript
+            # or continue the chat with a specific instruction.
+            # Let's continue the chat but enforce JSON via the model config we created in _create_grading_model.
+            
+            # Re-creating chat session might be tricky if we want to enforce JSON on the *next* message.
+            # _create_grading_model uses a fresh model. Let's feed the history as context in the prompt
+            # or just use the chat method if we can set generation config dynamically.
+            # Gemini Python SDK allows generation_config in send_message? Yes.
+            
+            # Let's use the existing chat method but with a new model that enforces JSON.
+            # We need to reconstruct the chat on the new JSON-enforcing model.
+            
             chat = model.start_chat(history=history)
             
-            feedback_prompts = {
-                "nice": """IMPORTANT: L'entretien est maintenant TERMINÉ. Tu ne poses PLUS de questions.
-                
-                Ta tâche est de rédiger un FEEDBACK DÉTAILLÉ analysant la performance globale du candidat.
-                
-                Analyse:
-                - Les points forts démontrés durant l'entretien
-                - La qualité et la pertinence des réponses données
-                - Les exemples concrets fournis
-                - Les axes d'amélioration possibles
-                
-                Adopte un ton encourageant et constructif. Rédige 4-5 phrases en paragraphes.
-                Ne pose AUCUNE question. Ne dis pas au revoir. Fournis uniquement l'analyse.""",
-                
-                "neutral": """IMPORTANT: L'entretien est maintenant TERMINÉ. Tu ne poses PLUS de questions.
-                
-                Ta tâche est de rédiger un FEEDBACK OBJECTIF analysant la performance du candidat.
-                
-                Analyse:
-                - La structure et la clarté des réponses
-                - La pertinence des exemples et expériences mentionnés
-                - Les compétences démontrées
-                - Les domaines nécessitant un développement
-                
-                Reste factuel et professionnel. Rédige 4-5 phrases en paragraphes.
-                Ne pose AUCUNE question. Ne dis pas au revoir. Fournis uniquement l'analyse.""",
-                
-                "mean": """IMPORTANT: L'entretien est maintenant TERMINÉ. Tu ne poses PLUS de questions.
-                
-                Ta tâche est de rédiger un FEEDBACK CRITIQUE analysant la performance du candidat.
-                
-                Analyse:
-                - Les faiblesses identifiées dans les réponses
-                - Les manques de préparation ou d'expérience concrète
-                - Les réponses vagues ou insuffisantes
-                - Les points à améliorer de manière prioritaire
-                
-                Sois direct et exigeant dans ton évaluation. Rédige 4-5 phrases en paragraphes.
-                Ne pose AUCUNE question. Ne dis pas au revoir. Fournis uniquement l'analyse."""
-            }
+            feedback_prompt = f"""IMPORTANT: L'entretien est TERMINÉ.
             
-            response = chat.send_message(feedback_prompts[interviewer_type])
-            feedback = response.text
+            Ta tâche est de générer un FEEDBACK STRUCTURÉ au format JSON.
             
-            logger.info("✅ Interview feedback generated")
-            return feedback
+            Analyse la performance du candidat selon le style '{interviewer_type}'.
+            
+            Format JSON attendu:
+            {{
+                "score": 8,  // Note globale sur 10
+                "strengths": ["Point fort 1", "Point fort 2", "Point fort 3"],
+                "weaknesses": ["Point faible 1", "Point faible 2"],
+                "tips": ["Conseil actionnable 1", "Conseil actionnable 2"],
+                "overall_comment": "Un paragraphe de résumé général sur la performance..."
+            }}
+            
+            Consignes par style:
+            - nice: Ton encourageant, souligne le potentiel.
+            - neutral: Ton factuel, professionnel et objectif.
+            - mean: Ton exigeant, pointe directement les lacunes.
+            
+            Génère UNIQUEMENT le JSON."""
+            
+            response = chat.send_message(feedback_prompt)
+            
+            try:
+                feedback_data = json.loads(response.text)
+                logger.info("✅ Structured interview feedback generated")
+                return feedback_data
+            except json.JSONDecodeError:
+                logger.error(f"❌ Failed to parse feedback JSON: {response.text}")
+                # Fallback
+                return {
+                    "score": 5,
+                    "strengths": ["Participation à l'entretien"],
+                    "weaknesses": ["Erreur de génération du feedback"],
+                    "tips": ["Veuillez réessayer plus tard"],
+                    "overall_comment": response.text
+                }
             
         except Exception as e:
             logger.error(f"❌ Error generating feedback: {str(e)}")

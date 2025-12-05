@@ -85,7 +85,11 @@ export interface QuestionAnswer {
 }
 
 export interface InterviewSummary {
-  feedback: string;
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+  tips: string[];
+  overall_comment: string;
   questions: QuestionAnswer[];
 }
 

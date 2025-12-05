@@ -7,7 +7,7 @@ import { Input } from "~/components/ui/input";
 import { useSetupStore } from "~/services/usesetupstore";
 import { Loader2, Upload, CheckCircle } from "lucide-react";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Importer votre CV - Entervio" },
     { name: "description", content: "Téléchargez votre CV pour une analyse personnalisée" },
@@ -51,8 +51,8 @@ export default function ResumeUpload() {
   }, [countdown, navigate]);
 
   return (
-    <div className="container mx-auto px-6 py-16 max-w-xl">
-      <Card className="border-2 shadow-lg">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
+      <Card className="w-full max-w-xl border-2 shadow-lg">
         <CardHeader>
           <CardTitle className="text-2xl text-center">
             Importer votre CV
@@ -80,15 +80,17 @@ export default function ResumeUpload() {
             ) : (
               <>
                 <Input
+                  id="resume-upload-button"
                   type="file"
                   accept=".pdf"
                   onChange={handleFileChange}
                   disabled={isUploading}
+                  className="hidden"
                 />
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full flex items-center justify-center gap-2"
+                  className="w-full flex items-center justify-center gap-2 h-12"
                   asChild
                   disabled={isUploading}
                 >
@@ -111,7 +113,7 @@ export default function ResumeUpload() {
           </div>
 
           {error && (
-            <p className="text-sm text-red-500" aria-live="polite">
+            <p className="text-sm text-red-500 text-center" aria-live="polite">
               {error}
             </p>
           )}
@@ -122,7 +124,7 @@ export default function ResumeUpload() {
           </p>
 
           <p className="text-xs text-muted-foreground text-center mt-2">
-            <Link to="/" className="underline">
+            <Link to="/" className="underline hover:text-primary transition-colors">
               Passer cette étape pour le moment
             </Link>
           </p>
