@@ -40,18 +40,33 @@ function useTypewriter(phrases: string[], typingSpeed = 50, deletingSpeed = 30, 
 
 function formatSalary(salary: string): string {
     // Example: "Annuel de 35000.0 Euros à 39000.0 Euros sur 12.0 mois"
+    // Example: "Mensuel de 32000.0 Euros à 35000.0 Euros sur 12.0 mois"
     try {
-        // Extract numbers
-        const matches = salary.match(/(\d+)\.0/g);
-        if (matches && matches.length >= 2) {
-            const min = parseInt(matches[0]);
-            const max = parseInt(matches[1]);
+        // Extract numbers (handle 35000.0, 35000, 35 000)
+        const matches = salary.replace(/\s/g, '').match(/(\d+(?:[\.,]\d+)?)/g);
 
-            const formatK = (n: number) => `${Math.round(n / 1000)}k€`;
+        if (matches && matches.length >= 1) {
+            // Parse numbers (replace comma with dot if needed)
+            const nums = matches.map(m => parseFloat(m.replace(',', '.')));
+            const min = nums[0];
+            const max = nums.length > 1 ? nums[1] : min;
 
-            if (salary.toLowerCase().includes("annuel")) {
-                return `${formatK(min)} - ${formatK(max)} / an`;
+            const formatNum = (n: number) => {
+                if (n >= 1000) return `${Math.round(n / 1000)}k€`;
+                return `${n}€`;
+            };
+
+            const lowerSalary = salary.toLowerCase();
+            let period = "";
+
+            if (lowerSalary.includes("annuel") || lowerSalary.includes("an")) period = "/ an";
+            else if (lowerSalary.includes("mensuel") || lowerSalary.includes("mois")) period = "/ mois";
+            else if (lowerSalary.includes("horaire") || lowerSalary.includes("heure")) period = "/ h";
+
+            if (min === max) {
+                return `${formatNum(min)} ${period}`;
             }
+            return `${formatNum(min)} - ${formatNum(max)} ${period}`;
         }
         return salary;
     } catch (e) {
