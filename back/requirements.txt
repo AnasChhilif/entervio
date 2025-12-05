@@ -28,7 +28,7 @@ google-generativeai>=0.8.0
 # Voice Chat - Groq Solution (Python 3.13 compatible!)
 groq==0.11.0
 websockets==12.0
-edge-tts==7.2.3
+edge-tts==7.0.0
 
 # Testing
 pytest==8.3.3
