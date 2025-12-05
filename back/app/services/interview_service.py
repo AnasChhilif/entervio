@@ -245,7 +245,9 @@ class InterviewService:
                 interview.interviewer_style
             )
 
-            interview.global_feedback = summary
+            # Serialize dictionary to JSON string for storage
+            import json
+            interview.global_feedback = json.dumps(summary)
 
             db.commit()
             
@@ -379,6 +381,8 @@ class InterviewService:
             its individual feedback
         """
         interview = db.query(Interview).filter(Interview.id == interview_id).first()
+        
+        logger.info(f"🔍 Fetching summary for interview {interview_id}")
         
         if not interview:
             return None

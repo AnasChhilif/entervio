@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { Loader2, AlertCircle, CheckCircle2, MessageSquare, Star, Quote, Lightbulb } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, MessageSquare, Star, Quote, Lightbulb, TrendingUp, AlertTriangle, Target } from "lucide-react";
 import { cn } from "~/lib/utils";
 
 interface QuestionAnswer {
@@ -11,7 +11,11 @@ interface QuestionAnswer {
 }
 
 interface InterviewSummary {
-  feedback: string;
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+  tips: string[];
+  overall_comment: string;
   questions: QuestionAnswer[];
 }
 
@@ -60,6 +64,21 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
     );
   }
 
+  // Safe access to properties with fallbacks for legacy data
+  const safeSummary = {
+    score: summary.score ?? 0,
+    strengths: summary.strengths ?? [],
+    weaknesses: summary.weaknesses ?? [],
+    tips: summary.tips ?? [],
+    overall_comment: summary.overall_comment ?? (typeof summary === 'string' ? summary : "Pas de commentaire global."),
+    questions: summary.questions ?? []
+  };
+
+  // If we have legacy data (no score/strengths but maybe just feedback text in a different field or just missing),
+  // we might want to show a legacy view or just the safe view.
+  // If summary was just a string in the past, the parent might be passing it wrongly.
+  // Let's assume safeSummary fixes the crash.
+
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
 
@@ -76,26 +95,111 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
         </p>
       </div>
 
-      {/* Global Feedback Card */}
-      <Card className="border-border shadow-[var(--shadow-diffuse)] bg-card overflow-hidden relative group">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2.5 bg-primary/10 rounded-xl text-primary ring-1 ring-primary/20">
-              <CheckCircle2 className="h-6 w-6" />
+      {/* Global Score & Summary */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Score Card */}
+        <Card className="md:col-span-1 border-border shadow-[var(--shadow-diffuse)] bg-card overflow-hidden relative group flex flex-col items-center justify-center p-6">
+          <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-2">Score Global</div>
+            <div className="flex items-baseline gap-1">
+              <span className={cn("text-6xl font-bold font-serif", summary.score >= 8 ? "text-emerald-600" : summary.score >= 5 ? "text-amber-600" : "text-red-600")}>
+                {summary.score}
+              </span>
+              <span className="text-2xl text-muted-foreground font-light">/10</span>
             </div>
-            <CardTitle className="text-2xl font-serif font-medium">Feedback Général</CardTitle>
+            <div className="mt-4 flex gap-1">
+              {[...Array(10)].map((_, i) => (
+                <div key={i} className={cn("w-1.5 h-8 rounded-full transition-all", i < summary.score ? (summary.score >= 8 ? "bg-emerald-500" : summary.score >= 5 ? "bg-amber-500" : "bg-red-500") : "bg-muted")} />
+              ))}
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="prose prose-lg text-foreground/80 leading-relaxed max-w-none font-light">
-            {summary.feedback}
-          </div>
-        </CardContent>
-      </Card>
+        </Card>
+
+        {/* Overall Comment */}
+        <Card className="md:col-span-2 border-border shadow-[var(--shadow-diffuse)] bg-card overflow-hidden relative group">
+          <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                <Quote className="h-5 w-5" />
+              </div>
+              <CardTitle className="text-xl font-serif font-medium">Synthèse</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg text-foreground/80 leading-relaxed font-light italic">
+              "{summary.overall_comment}"
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detailed Analysis Grid */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Strengths */}
+        <Card className="border-border shadow-sm bg-card/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+              <CardTitle className="text-lg font-medium">Points Forts</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {summary.strengths.map((item, i) => (
+                <li key={i} className="flex gap-3 text-sm text-foreground/80">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        {/* Weaknesses */}
+        <Card className="border-border shadow-sm bg-card/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <CardTitle className="text-lg font-medium">À Améliorer</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {summary.weaknesses.map((item, i) => (
+                <li key={i} className="flex gap-3 text-sm text-foreground/80">
+                  <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        {/* Tips */}
+        <Card className="border-border shadow-sm bg-card/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-blue-500" />
+              <CardTitle className="text-lg font-medium">Conseils</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {summary.tips.map((item, i) => (
+                <li key={i} className="flex gap-3 text-sm text-foreground/80">
+                  <Lightbulb className="h-5 w-5 text-blue-500 shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Detailed Questions */}
-      <div className="space-y-8">
+      <div className="space-y-8 pt-8">
         <div className="flex items-center gap-3 pb-4 border-b border-border/50">
           <MessageSquare className="h-6 w-6 text-primary" />
           <h2 className="text-2xl font-serif font-medium">Détails par question</h2>
