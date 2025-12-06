@@ -469,7 +469,7 @@ Présentez-vous. Et soyez synthétique."""
                 score = int(similarity * 100)
                 
                 job["relevance_score"] = score
-                job["relevance_reasoning"] = "Matched via Vector Similarity"
+                job["relevance_reasoning"] = "Correspondance IA basée sur votre profil"
                 reranked_jobs.append(job)
 
             # 4. Sort
@@ -486,6 +486,51 @@ Présentez-vous. Et soyez synthétique."""
                 job["relevance_reasoning"] = "Error in ranking"
             return jobs
 
+
+    async def extract_keywords_from_query(self, query: str, user_context: str = "") -> Dict[str, Any]:
+        """
+        Extract search keywords and location from a natural language query using LLM,
+        considering the user's professional context.
+        """
+        logger.info(f"🔍 Extracting keywords from query: '{query}' with context length: {len(user_context)}")
+        
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05')
+            
+            prompt = f"""Role: You are an expert Technical Recruiter in France.
+                        Task: Analyze the user's profile and query to generate optimized search parameters for the French job market (France Travail / APEC).
+
+                        User Profile: {user_context}
+                        User Query: "{query}"
+
+                        Instructions:
+                        1. KEYWORDS: Extract the core job role and translate it into **Standard French Market Titles**.
+                        - Convert "Software Engineer" to "Ingénieur Logiciel" OR "Développeur".
+                        - Convert "Senior" to "Senior" OR "Confirmé".
+                        - Convert "Junior" to "Débutant" OR "Junior".
+                        2. EXPANSION: Generate an array of 3 distinct search variations ranging from specific to broad.
+                        - Variation 1: Precise Title (e.g., "Développeur React Senior")
+                        - Variation 2: Broader Title (e.g., "Ingénieur Frontend")
+                        - Variation 3: Tech Stack Focus (e.g., "React.js Confirmé")
+                        3. LOCATION: Extract the city name. 
+
+                        Output JSON format strictly:
+                        {{
+                        "keywords": ["Variation 1", "Variation 2", "Variation 3"],
+                        "location": "Paris",
+                        }}"""
+            
+            response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+            result = json.loads(response.text)
+            print(result)
+            
+            logger.info(f"✅ Extracted: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Error extracting keywords: {str(e)}")
+            # Fallback
+            return {"keywords": query.split()[:3], "location": None}
 
 # Singleton instance - initialized on first import
 _llm_service_instance = None

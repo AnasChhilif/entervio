@@ -1,168 +1,264 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Search, MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp, ArrowRight, Search, CheckCircle2 } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
 
-function JobCard({ job }: { job: JobOffer }) {
-    const [isOpen, setIsOpen] = useState(false);
+function useTypewriter(phrases: string[], typingSpeed = 50, deletingSpeed = 30, pauseDuration = 2000) {
+    const [text, setText] = useState("");
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [loopNum, setLoopNum] = useState(0);
+    const [typingSpeedState, setTypingSpeedState] = useState(typingSpeed);
 
-    const getApplyUrl = () => {
-        return job.urlPartner || job.contact?.urlPostulation || job.origineOffre?.urlOrigine;
-    };
+    useEffect(() => {
+        const handleTyping = () => {
+            const i = loopNum % phrases.length;
+            const fullText = phrases[i];
 
-    const applyUrl = getApplyUrl();
+            setText(isDeleting
+                ? fullText.substring(0, text.length - 1)
+                : fullText.substring(0, text.length + 1)
+            );
+
+            setTypingSpeedState(isDeleting ? deletingSpeed : typingSpeed);
+
+            if (!isDeleting && text === fullText) {
+                setTimeout(() => setIsDeleting(true), pauseDuration);
+            } else if (isDeleting && text === "") {
+                setIsDeleting(false);
+                setLoopNum(loopNum + 1);
+            }
+        };
+
+        const timer = setTimeout(handleTyping, typingSpeedState);
+        return () => clearTimeout(timer);
+    }, [text, isDeleting, loopNum, phrases, typingSpeed, deletingSpeed, pauseDuration, typingSpeedState]);
+
+    return text;
+}
+
+function formatSalary(salary: string): string {
+    // Example: "Annuel de 35000.0 Euros à 39000.0 Euros sur 12.0 mois"
+    // Example: "Mensuel de 32000.0 Euros à 35000.0 Euros sur 12.0 mois"
+    try {
+        // Extract numbers (handle 35000.0, 35000, 35 000)
+        const matches = salary.replace(/\s/g, '').match(/(\d+(?:[\.,]\d+)?)/g);
+        
+        if (matches && matches.length >= 1) {
+            // Parse numbers (replace comma with dot if needed)
+            const nums = matches.map(m => parseFloat(m.replace(',', '.')));
+            const min = nums[0];
+            const max = nums.length > 1 ? nums[1] : min;
+
+            const formatNum = (n: number) => {
+                if (n >= 1000) return `${Math.round(n / 1000)}k€`;
+                return `${n}€`;
+            };
+
+            const lowerSalary = salary.toLowerCase();
+            let period = "";
+            
+            if (lowerSalary.includes("annuel") || lowerSalary.includes("an")) period = "/ an";
+            else if (lowerSalary.includes("mensuel") || lowerSalary.includes("mois")) period = "/ mois";
+            else if (lowerSalary.includes("horaire") || lowerSalary.includes("heure")) period = "/ h";
+
+            if (min === max) {
+                return `${formatNum(min)} ${period}`;
+            }
+            return `${formatNum(min)} - ${formatNum(max)} ${period}`;
+        }
+        return salary;
+    } catch (e) {
+        return salary;
+    }
+}
+
+// --- Components ---
+
+function JobCard({ job, isSelected, onClick }: { job: JobOffer; isSelected: boolean; onClick: () => void }) {
+    const matchColor = job.relevance_score && job.relevance_score >= 80 ? "bg-emerald-500" : "bg-yellow-500";
+    const matchTextColor = job.relevance_score && job.relevance_score >= 80 ? "text-emerald-600" : "text-yellow-600";
 
     return (
         <div
+            onClick={onClick}
             className={cn(
-                "group bg-card rounded-xl shadow-sm hover:shadow-[var(--shadow-diffuse)] transition-all duration-300 border border-border overflow-hidden cursor-pointer hover:-translate-y-1",
-                isOpen ? "ring-1 ring-primary/20 shadow-[var(--shadow-diffuse)]" : ""
+                "group relative p-5 transition-all duration-200 cursor-pointer hover:bg-gray-50",
+                isSelected ? "bg-white" : "bg-white",
+                "border-b border-gray-100 last:border-0" // Hairline separator
             )}
-            onClick={() => setIsOpen(!isOpen)}
         >
-            <div className="p-6 flex items-start gap-5">
-                {/* Logo Placeholder */}
-                <div className="w-14 h-14 rounded-xl bg-primary/5 flex items-center justify-center shrink-0 text-primary border border-primary/10">
-                    <Building2 className="w-7 h-7" />
-                </div>
+            {/* Left Edge Indicator */}
+            <div className={cn("absolute left-0 top-0 bottom-0 w-1 transition-colors", isSelected ? "bg-primary" : "bg-transparent group-hover:bg-gray-200")} />
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start gap-4">
-                        <div>
-                            <h3 className="text-xl font-serif font-bold text-foreground group-hover:text-primary transition-colors leading-tight">
-                                {job.intitule}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                <p className="text-sm text-muted-foreground font-medium">
-                                    {job.entreprise?.nom || "Entreprise confidentielle"}
-                                </p>
-                                {job.relevance_score !== undefined && (
-                                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium text-xs">
-                                        {job.relevance_score}% Match
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                            {applyUrl && (
-                                <Button
-                                    asChild
-                                    size="sm"
-                                    className="rounded-full bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 hover:border-primary/30 shadow-none font-medium px-5 h-8 transition-all"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <a
-                                        href={applyUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Postuler
-                                    </a>
-                                </Button>
-                            )}
-                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary rounded-lg">
-                                {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                            </Button>
-                        </div>
+            <div className="flex justify-between items-start gap-3 mb-1">
+                <h3 className={cn(
+                    "font-serif font-bold text-lg leading-tight transition-colors text-gray-900",
+                    isSelected && "text-primary"
+                )}>
+                    {job.intitule}
+                </h3>
+                
+                {/* Match Score: Badge of Honor */}
+                {job.relevance_score !== undefined && (
+                    <div className={cn("shrink-0 font-bold text-sm flex items-center gap-1", matchTextColor)}>
+                        {job.relevance_score}% Match
                     </div>
-
-                    <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1.5 bg-secondary/30 px-2.5 py-1 rounded-md border border-secondary/50">
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span>{job.lieuTravail.libelle}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-secondary/30 px-2.5 py-1 rounded-md border border-secondary/50">
-                            <Briefcase className="w-3.5 h-3.5" />
-                            <span>{job.typeContrat}</span>
-                        </div>
-                        {job.salaire?.libelle && (
-                            <Badge variant="outline" className="text-xs font-normal text-muted-foreground border-border bg-background">
-                                {job.salaire.libelle}
-                            </Badge>
-                        )}
-                    </div>
-                </div>
+                )}
             </div>
 
-            {/* Expanded Details */}
-            {isOpen && (
-                <div className="px-6 pb-6 pt-0 animate-in slide-in-from-top-2 duration-300">
-                    <div className="h-px w-full bg-border/50 mb-6" />
+            {/* Naked Data: Company · Location · Salary */}
+            <div className="flex flex-wrap items-center gap-x-2 text-sm text-gray-500 font-medium mb-3">
+                <span className="uppercase tracking-wide text-xs font-bold text-gray-400">
+                    {job.entreprise?.nom || "Confidentiel"}
+                </span>
+                <span className="text-gray-300">·</span>
+                <span>{job.lieuTravail.libelle}</span>
+                <span className="text-gray-300">·</span>
+                <span>{job.typeContrat}</span>
+                {job.salaire?.libelle && (
+                    <>
+                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-700">{formatSalary(job.salaire.libelle)}</span>
+                    </>
+                )}
+            </div>
 
-                    {job.relevance_reasoning && (
-                        <div className="mb-6 p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                            <div className="flex items-center gap-2 text-sm font-bold text-emerald-800 mb-2">
-                                <Sparkles className="w-4 h-4 text-emerald-600" />
-                                <span>Analyse IA</span>
-                            </div>
-                            <p className="text-sm text-emerald-900/80 leading-relaxed">
-                                {job.relevance_reasoning}
-                            </p>
-                        </div>
-                    )}
-
-                    <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
-                        <p className="whitespace-pre-line">{job.description}</p>
-                    </div>
-
-                    <div className="mt-8 flex justify-end pt-4 border-t border-border/50">
-                        {applyUrl && (
-                            <Button asChild size="lg" className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-8">
-                                <a
-                                    href={applyUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    Postuler maintenant <ExternalLink className="w-4 h-4 ml-2" />
-                                </a>
-                            </Button>
-                        )}
-                    </div>
+            {/* Inline AI Insight */}
+            {job.relevance_reasoning && (
+                <div className="flex items-start gap-2 text-sm text-gray-600 font-serif italic leading-relaxed">
+                    <Sparkles className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <p className="line-clamp-2">{job.relevance_reasoning}</p>
                 </div>
             )}
+            
+            {/* Arrow Action (Hidden by default, visible on hover/select) */}
+            <div className="absolute right-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                 <ArrowRight className="w-5 h-5 text-gray-400" />
+            </div>
+        </div>
+    );
+}
+
+function JobDetail({ job }: { job: JobOffer | null }) {
+    if (!job) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center text-center p-12 text-muted-foreground bg-white rounded-2xl border border-dashed border-gray-200">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                    <Briefcase className="w-8 h-8 text-gray-300" />
+                </div>
+                <p className="text-lg font-medium text-gray-900">Sélectionnez une offre</p>
+                <p className="text-sm mt-1">Cliquez sur une offre à gauche pour voir les détails.</p>
+            </div>
+        );
+    }
+
+    const applyUrl = job.urlPartner || job.contact?.urlPostulation || job.origineOffre?.urlOrigine;
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm h-[calc(100vh-140px)] overflow-y-auto sticky top-4 custom-scrollbar">
+            {/* Header Image/Pattern */}
+            <div className="h-32 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-100 relative overflow-hidden">
+                <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+            </div>
+
+            <div className="px-8 pb-12 -mt-12 relative">
+                {/* Company Logo (Placeholder) */}
+                <div className="w-24 h-24 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center mb-6">
+                    <Building2 className="w-10 h-10 text-gray-800" />
+                </div>
+
+                {/* Title & Actions */}
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-serif font-bold text-gray-900 leading-tight mb-2">
+                            {job.intitule}
+                        </h1>
+                        <div className="flex items-center gap-2 text-lg text-gray-600">
+                            <span className="font-medium">{job.entreprise?.nom || "Entreprise confidentielle"}</span>
+                            <span>•</span>
+                            <span>{job.lieuTravail.libelle}</span>
+                        </div>
+                    </div>
+                    
+                    {applyUrl && (
+                        <Button asChild size="lg" className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 h-12 text-base font-medium transition-transform hover:-translate-y-0.5">
+                            <a href={applyUrl} target="_blank" rel="noopener noreferrer">
+                                Postuler
+                                <ExternalLink className="w-4 h-4 ml-2" />
+                            </a>
+                        </Button>
+                    )}
+                </div>
+
+                {/* AI Analysis */}
+                {job.relevance_reasoning && (
+                    <div className="mb-10 p-6 bg-emerald-50/40 rounded-2xl border border-emerald-100/50">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="p-1.5 bg-emerald-100 rounded-lg">
+                                <Sparkles className="w-4 h-4 text-emerald-700" />
+                            </div>
+                            <h3 className="font-bold text-emerald-900 text-sm uppercase tracking-wide">Pourquoi ça matche</h3>
+                        </div>
+                        <div className="prose prose-sm max-w-none text-emerald-900/80 leading-relaxed">
+                            <p>{job.relevance_reasoning}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-xs font-medium text-gray-500 uppercase mb-1">Contrat</p>
+                        <p className="font-semibold text-gray-900">{job.typeContrat}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-xs font-medium text-gray-500 uppercase mb-1">Salaire</p>
+                        <p className="font-semibold text-gray-900">{job.salaire?.libelle ? formatSalary(job.salaire.libelle) : "Non spécifié"}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-xs font-medium text-gray-500 uppercase mb-1">Expérience</p>
+                        <p className="font-semibold text-gray-900">Non spécifié</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-xs font-medium text-gray-500 uppercase mb-1">Publié le</p>
+                        <p className="font-semibold text-gray-900">{new Date(job.dateCreation).toLocaleDateString()}</p>
+                    </div>
+                </div>
+
+                {/* Description */}
+                <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed">
+                    <h3 className="font-serif font-bold text-gray-900 text-xl mb-4">Description du poste</h3>
+                    <p className="whitespace-pre-line">{job.description}</p>
+                </div>
+            </div>
         </div>
     );
 }
 
 export default function JobsSearch() {
-    const [keywords, setKeywords] = useState("");
-    const [location, setLocation] = useState("");
+    const [nlQuery, setNlQuery] = useState("");
     const [jobs, setJobs] = useState<JobOffer[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
-    const [searchMode, setSearchMode] = useState<"standard" | "smart">("standard");
+    const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-    const handleSearch = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        if (!keywords.trim() && searchMode === "standard") return;
-
-        setIsLoading(true);
-        setJobs([]); // Clear previous results
-        try {
-            const results = await jobsService.search(keywords, location);
-            setJobs(results);
-            setSearchMode("standard");
-        } catch (error) {
-            console.error("Search failed:", error);
-        } finally {
-            setIsLoading(false);
-            setHasSearched(true);
-        }
-    };
+    const selectedJob = jobs.find(j => j.id === selectedJobId) || null;
 
     const handleSmartSearch = async () => {
+        // Allow empty query (uses profile)
+        // if (!nlQuery.trim()) return;
+
         setIsLoading(true);
         setJobs([]); // Clear previous results
+        setSelectedJobId(null);
         try {
-            // Smart search doesn't strictly require keywords as it uses the resume
-            const results = await jobsService.smartSearch(location);
+            const results = await jobsService.smartSearch(undefined, nlQuery);
             setJobs(results);
-            setSearchMode("smart");
+            if (results.length > 0) {
+                setSelectedJobId(results[0].id); // Auto-select first job
+            }
         } catch (error) {
             console.error("Smart search failed:", error);
         } finally {
@@ -171,92 +267,125 @@ export default function JobsSearch() {
         }
     };
 
+    const quickChips = [
+        "100% Télétravail",
+        "Salaire > 60k",
+        "Startups",
+        "Python"
+    ];
+
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center py-12 px-4">
-            {/* Main Column */}
-            <div className="w-full max-w-[800px] space-y-8">
-
-                {/* Header */}
-                <div className="text-center space-y-4 mb-8">
-                    <h1 className="text-5xl font-serif font-medium text-foreground tracking-tight">
-                        Opportunités
-                    </h1>
-                    <p className="text-lg text-muted-foreground font-light max-w-2xl mx-auto">
-                        Découvrez les offres qui correspondent à votre véritable potentiel.
-                    </p>
-                </div>
-
-                {/* Search Bar */}
-                <div className="bg-background/60 backdrop-blur-xl p-2 rounded-2xl shadow-[var(--shadow-diffuse)] border border-border/40 flex flex-col sm:flex-row gap-2 relative z-10">
-                    <div className="relative flex-1 group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <Input
-                            placeholder="Poste, entreprise, mot-clé..."
-                            className="pl-12 h-14 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent rounded-xl"
-                            value={keywords}
-                            onChange={(e) => setKeywords(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        />
-                    </div>
-                    <div className="h-px sm:h-auto sm:w-px bg-border/50 mx-2" />
-                    <div className="relative w-full sm:w-1/3 group">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <Input
-                            placeholder="Lieu (ex: Paris)"
-                            className="pl-12 h-14 border-0 shadow-none focus-visible:ring-0 text-base bg-transparent rounded-xl"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        />
-                    </div>
-                    <Button
-                        onClick={(e) => handleSearch(e)}
-                        disabled={isLoading}
-                        className="h-14 px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium text-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]"
-                    >
-                        {isLoading && searchMode === "standard" ? "Recherche..." : "Rechercher"}
-                    </Button>
-                </div>
-
-                {/* Smart Search Toggle */}
-                <div className="flex justify-center">
-                    <Button
-                        variant="outline"
-                        size="lg"
-                        onClick={handleSmartSearch}
-                        disabled={isLoading}
-                        className={cn(
-                            "gap-2 h-12 px-6 rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary transition-all duration-300 hover:border-primary/50",
-                            searchMode === "smart" && hasSearched ? "bg-primary/10 text-primary border-primary/50 shadow-inner" : "text-muted-foreground bg-background/50"
-                        )}
-                    >
-                        <Sparkles className={cn("w-4 h-4", isLoading && searchMode === "smart" ? "animate-spin" : "")} />
-                        {isLoading && searchMode === "smart" ? "Analyse du profil..." : "Recherche Intelligente (IA)"}
-                    </Button>
-                </div>
-
-                {/* Results */}
-                <div className="space-y-4">
-                    {jobs.length > 0 ? (
-                        jobs.map((job) => (
-                            <JobCard key={job.id} job={job} />
-                        ))
-                    ) : hasSearched && !isLoading ? (
-                        <div className="text-center py-16 bg-card rounded-lg border border-border border-dashed">
-                            <p className="text-muted-foreground">No opportunities found. Try adjusting your search.</p>
-                        </div>
-                    ) : !hasSearched && !isLoading ? (
-                        <div className="text-center py-16">
-                            <p className="text-muted-foreground text-sm">
-                                Enter a keyword or use Smart Search to find jobs tailored to your resume.
+        <div className="min-h-screen bg-[#FAFAFA] text-gray-900 font-sans">
+            {/* Header & Search */}
+            <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+                <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <h1 className="text-2xl font-serif font-bold text-gray-900 tracking-tight">
+                                Opportunités
+                            </h1>
+                            <p className="text-sm text-gray-500 hidden md:block">
+                                Trouvez votre prochain défi.
                             </p>
                         </div>
+
+                        {/* Search Bar */}
+                        <div className="flex-1 max-w-2xl">
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <Search className="h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
+                                </div>
+                                <input
+                                    type="text"
+                                    className="block w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 focus:bg-white transition-all shadow-sm"
+                                    placeholder="Décrivez votre job idéal ou laissez vide pour utiliser votre profil..."
+                                    value={nlQuery}
+                                    onChange={(e) => setNlQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && handleSmartSearch()}
+                                />
+                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+                                    <button
+                                        onClick={handleSmartSearch}
+                                        disabled={isLoading}
+                                        className="p-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                                    >
+                                        {isLoading ? (
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <ArrowRight className="w-4 h-4" />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Quick Chips */}
+                    <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+                        {quickChips.map((chip) => (
+                            <button
+                                key={chip}
+                                onClick={() => setNlQuery(chip)}
+                                className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-xs font-medium text-gray-600 transition-all whitespace-nowrap"
+                            >
+                                {chip}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Main Content: Split View */}
+                <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-6 h-[calc(100vh-140px)]">
+                    {jobs.length > 0 ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+                            {/* Left Column: List (Scrollable) */}
+                            <div className="lg:col-span-4 lg:h-full lg:overflow-y-auto custom-scrollbar pr-2 space-y-3 pb-20">
+                                <div className="mb-4 flex items-center justify-between px-1">
+                                    <span className="text-sm font-medium text-gray-500">{jobs.length} résultats</span>
+                                </div>
+                                {jobs.map((job) => (
+                                    <JobCard 
+                                        key={job.id} 
+                                        job={job} 
+                                        isSelected={selectedJobId === job.id}
+                                        onClick={() => {
+                                            setSelectedJobId(job.id);
+                                            // On mobile, we might want to scroll to detail or open modal
+                                            // For now, this is optimized for desktop split view
+                                        }}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Right Column: Detail (Sticky) */}
+                            <div className="hidden lg:block lg:col-span-8 h-full">
+                                <JobDetail job={selectedJob} />
+                            </div>
+                        </div>
+                    ) : hasSearched && !isLoading ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                                <Search className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <h3 className="text-xl font-serif font-bold text-gray-900 mb-2">Aucune opportunité trouvée</h3>
+                            <p className="text-gray-500">Essayez de reformuler votre recherche ou d'élargir vos critères.</p>
+                        </div>
+                    ) : !hasSearched && !isLoading ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto opacity-50">
+                            <Sparkles className="w-12 h-12 text-gray-300 mb-4" />
+                            <p className="text-gray-400 font-medium">Lancez une recherche pour voir les résultats</p>
+                        </div>
                     ) : (
-                        // Loading State Skeletons
-                        <div className="space-y-4">
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} className="h-32 bg-card rounded-lg border border-border animate-pulse" />
-                            ))}
+                        // Loading State
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full animate-pulse">
+                            <div className="lg:col-span-4 space-y-4">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div key={i} className="h-32 bg-gray-200 rounded-xl" />
+                                ))}
+                            </div>
+                            <div className="hidden lg:block lg:col-span-8">
+                                <div className="h-full bg-gray-100 rounded-2xl" />
+                            </div>
                         </div>
                     )}
                 </div>
@@ -264,4 +393,3 @@ export default function JobsSearch() {
         </div>
     );
 }
-

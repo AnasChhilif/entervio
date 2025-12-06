@@ -35,11 +35,32 @@ export const jobsService = {
         return response.data;
     },
 
-    smartSearch: async (location?: string): Promise<JobOffer[]> => {
+    smartSearch: async (location?: string, query?: string): Promise<JobOffer[]> => {
         const params = new URLSearchParams();
         if (location) params.append("location", location);
+        if (query) params.append("query", query);
 
         const response = await api.get(`/jobs/smart-search?${params.toString()}`);
         return response.data;
     },
+
+    searchLocations: async (query: string): Promise<City[]> => {
+        const params = new URLSearchParams({ query });
+        const response = await api.get(`/jobs/locations?${params.toString()}`);
+        return response.data;
+    },
 };
+
+export interface City {
+    nom: string;
+    code: string;
+    codesPostaux: string[];
+    departement?: {
+        code: string;
+        nom: string;
+    };
+    region?: {
+        code: string;
+        nom: string;
+    };
+}
