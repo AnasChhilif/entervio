@@ -5,7 +5,6 @@ from app.models.user import User
 from app.services.francetravail_service import francetravail_service
 from app.services.location_service import location_service
 from app.services.llm_service import llm_service
-from app.services.resume_service import resume_service_instance
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +12,34 @@ class SmartJobService:
     def __init__(self):
         pass
 
+    def _build_profile_summary(self, user: User) -> str:
+        """Builds a profile summary from relational user data."""
+        parts = []
+        
+        # Skills
+        tech_skills = [s.name for s in user.skills_list if s.category == 'technical']
+        if tech_skills:
+            parts.append(f"Technical Skills: {', '.join(tech_skills[:10])}")
+        
+        # Experience
+        if user.work_experiences:
+            exp_summary = []
+            for w in user.work_experiences[:3]:
+                exp_summary.append(f"{w.role} at {w.company}")
+            parts.append(f"Experience: {'; '.join(exp_summary)}")
+        
+        # Projects
+        if user.projects:
+            proj_summary = [p.name for p in user.projects[:3]]
+            parts.append(f"Projects: {', '.join(proj_summary)}")
+            
+        return "\n".join(parts) if parts else "No profile data available."
+
     async def smart_search(self, user: User, location: Optional[str] = None, query: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Performs a smart job search for the user.
         
-        1. Extracts keywords from user's parsed resume OR from manual query.
+        1. Extracts keywords from user's relational resume data OR from manual query.
         2. Searches France Travail API for each keyword in parallel.
         3. Aggregates and deduplicates results.
         4. Reranks results using LLM based on user profile.
@@ -25,7 +47,7 @@ class SmartJobService:
         logger.info(f"🧠 Starting smart search for user {user.id}")
 
         # 1. Get keywords and location
-        profile_summary = resume_service_instance.get_core_context(user.parsed_data or {})
+        profile_summary = self._build_profile_summary(user)
 
         if query:
             extraction_result = await llm_service.extract_keywords_from_query(query, profile_summary)
@@ -94,11 +116,7 @@ class SmartJobService:
             return []
 
         # 4. Rerank with LLM
-        # Construct a profile summary for the LLM
-        profile_summary = resume_service_instance.get_core_context(user.parsed_data or {})
-        
-        # Limit to top 20 for reranking to save tokens/time if list is huge
-        # (Or maybe 50? Let's stick to 30 for now to be safe)
+        # Limit to top 30 for reranking to save tokens/time
         jobs_to_rank = all_jobs[:30]
         
         reranked_jobs = await llm_service.compute_similarity_ranking(profile_summary, jobs_to_rank)
@@ -106,31 +124,20 @@ class SmartJobService:
         return reranked_jobs
 
     def _get_search_keywords(self, user: User) -> List[str]:
-        """Extracts top keywords from user's parsed data."""
-        if not user.parsed_data:
-            return []
-            
-        search_keywords_data = user.parsed_data.get("search_keywords", [])
+        """Extracts top keywords from user's relational data."""
+        keywords = []
         
-        # If we have explicit search keywords from the parser
-        if search_keywords_data:
-            # Extract just the keyword strings, maybe prioritize 'role' or 'skill'
-            # Let's just take the top 3 distinct keywords
-            keywords = [item.get("keywords") for item in search_keywords_data if item.get("keywords")]
-            return list(set(keywords))[:3]
-            
-        # Fallback: Use top technical skills
-        skills = user.parsed_data.get("skills", {}).get("technical", [])
-        if skills:
-            return skills[:3]
+        # Use top technical skills
+        tech_skills = [s.name for s in user.skills_list if s.category == 'technical']
+        if tech_skills:
+            keywords.extend(tech_skills[:3])
             
         # Fallback: Use last job title
-        experience = user.parsed_data.get("work_experience", [])
-        if experience:
-            last_role = experience[0].get("role")
+        if not keywords and user.work_experiences:
+            last_role = user.work_experiences[0].role
             if last_role:
-                return [last_role]
+                keywords.append(last_role)
                 
-        return []
+        return keywords
 
 smart_job_service = SmartJobService()

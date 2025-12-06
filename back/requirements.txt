@@ -40,3 +40,4 @@ Requests==2.32.5
 spacy==3.8.11
 email-validator==2.3.0
 numpy
+typst==0.14.4

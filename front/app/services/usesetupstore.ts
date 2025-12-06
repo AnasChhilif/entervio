@@ -50,9 +50,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     try {
       const { authApi } = await import("~/lib/api");
       const user = await authApi.getMe();
-      if (user.has_resume && user.candidate_id) {
+      if (user.has_resume) {
         set({
-          candidateId: user.candidate_id,
+          candidateId: user.id,
           candidateName: user.name || get().candidateName
         });
       } else if (user.name) {

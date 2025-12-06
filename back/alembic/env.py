@@ -9,6 +9,7 @@ from app.db import Base
 from app.models.interview import Interview
 from app.models.question_answer import QuestionAnswer
 from app.models.user import User
+from app.models.resume_models import WorkExperience, Education, Project, Language, Skill
 
 # Import settings to get DATABASE_URL
 from app.core.config import settings

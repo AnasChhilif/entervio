@@ -37,10 +37,75 @@ async def upload_resume(
         if "error" in parsed_data:
              raise HTTPException(status_code=500, detail=parsed_data["error"])
 
-        user.skills = parsed_data.get("skills")
-        user.experience = parsed_data.get("work_experience")
+        # Clear existing resume data
+        from app.models.resume_models import WorkExperience, Education, Project, Language, Skill
+        
+        # We need to manually delete if we don't trust cascade or want to be explicit
+        # SQLAlchemy cascade should handle it if configured correctly on User side, 
+        # but let's be safe and clear old data.
+        db.query(WorkExperience).filter(WorkExperience.user_id == user.id).delete()
+        db.query(Education).filter(Education.user_id == user.id).delete()
+        db.query(Project).filter(Project.user_id == user.id).delete()
+        db.query(Language).filter(Language.user_id == user.id).delete()
+        db.query(Skill).filter(Skill.user_id == user.id).delete()
+        
+        # Populate Work Experience
+        for exp in parsed_data.get("work_experience", []):
+            db.add(WorkExperience(
+                user_id=user.id,
+                company=exp.get("company"),
+                role=exp.get("role"),
+                location=exp.get("location"),
+                start_date=exp.get("start_date"),
+                end_date=exp.get("end_date"),
+                description=exp.get("description", "")
+            ))
+            
+        # Populate Education
+        for edu in parsed_data.get("education", []):
+            db.add(Education(
+                user_id=user.id,
+                institution=edu.get("institution"),
+                degree=edu.get("degree"),
+                field_of_study=edu.get("field_of_study"),
+                start_date=edu.get("start_date"),
+                end_date=edu.get("end_date"),
+                graduation_date=edu.get("graduation_date")
+            ))
+            
+        # Populate Projects
+        for proj in parsed_data.get("projects", []):
+            db.add(Project(
+                user_id=user.id,
+                name=proj.get("name"),
+                role=proj.get("role"),
+                start_date=proj.get("start_date"),
+                end_date=proj.get("end_date"),
+                tech_stack=proj.get("tech_stack"),
+                details=proj.get("details", "")
+            ))
+            
+        # Populate Languages
+        for lang in parsed_data.get("languages", []):
+            db.add(Language(
+                user_id=user.id,
+                name=lang.get("name", "Unknown"),
+                proficiency=lang.get("proficiency")
+            ))
+            
+        # Populate Skills
+        skills = parsed_data.get("skills", {})
+        for s in skills.get("technical", []):
+            db.add(Skill(user_id=user.id, name=s, category="technical"))
+        for s in skills.get("soft", []):
+            db.add(Skill(user_id=user.id, name=s, category="soft"))
+
         user.raw_resume_text = raw_text
-        user.parsed_data = parsed_data
+        # Update user contact info if extracted
+        contact = parsed_data.get("contact_info", {})
+        if contact.get("phone"): user.phone = contact.get("phone")
+        if contact.get("email"): user.email = contact.get("email") # Careful overwriting email? Maybe only if missing.
+        if contact.get("name"): user.name = contact.get("name")
 
         db.add(user)
         db.commit()
@@ -50,7 +115,7 @@ async def upload_resume(
             "message": "Resume uploaded and parsed successfully",
             "candidate_id": user.id,
             "name": user.name,
-            "skills": user.skills
+            "skills_count": len(user.skills_list)
         }
         
     except Exception as e:

@@ -1,14 +1,23 @@
-from asyncio.log import logger
 import json
 import os
+import logging
 from typing import Dict, Any, List
 from app.core.config import settings
 import pdfplumber
 import spacy
 import google.generativeai as genai
+import typst
+import tempfile
+from pathlib import Path
+
+from sqlalchemy.orm import Session
+from app.models.user import User
+from app.models.resume_models import WorkExperience, Education, Project, Language, Skill
 
 api_key = settings.GEMINI_API_KEY
 genai.configure(api_key=api_key)
+
+logger = logging.getLogger(__name__)
 
 
 class ResumeParserService:
@@ -64,28 +73,42 @@ class ResumeParserService:
             {{
             "company": "string",
             "role": "string",
+            "location": "string (nullable)",
             "start_date": "string (YYYY-MM)",
             "end_date": "string (YYYY-MM or 'Present')",
-            "responsibilities": ["string", "string"]
+            "description": "string (full text with bullet points as newlines or markdown)"
             }}
         ],
         "education": [
             {{
             "institution": "string",
             "degree": "string",
-            "graduation_date": "string"
+            "field_of_study": "string (nullable)",
+            "start_date": "string (nullable)",
+            "end_date": "string (nullable)",
+            "graduation_date": "string (nullable)"
+            }}
+        ],
+        "projects": [
+            {{
+            "name": "string",
+            "role": "string",
+            "start_date": "string",
+            "end_date": "string",
+            "tech_stack": "string",
+            "details": "string (description)"
+            }}
+        ],
+        "languages": [
+            {{
+            "name": "string",
+            "proficiency": "string"
             }}
         ],
         "skills": {{
             "technical": ["string"],
             "soft": ["string"]
-        }},
-        "search_keywords": [
-            {{
-                "keywords": "string (single strong keyword)",
-                "type": "skill|role|tool"
-            }}
-        ]
+        }}
         }}
 
         RESUME TEXT:
@@ -144,6 +167,113 @@ class ResumeParserService:
             context_parts.append(f"SOFT SKILLS: {soft_skills}")
             
         return "\n".join(context_parts)
+
+    def _compile_pdf(self, resume_data: Dict[str, Any]) -> bytes:
+        template_path = Path(__file__).parent.parent / "templates" / "resume.typ"
+        
+        return typst.compile(
+            template_path,
+            sys_inputs={"resume_data": json.dumps(resume_data, ensure_ascii=False)}
+        )
+
+    async def tailor_resume(self, db: Session, user_id: int, job_description: str) -> bytes:
+        """
+        Tailors the user's resume for the given job description and returns PDF bytes.
+        """
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+            
+        # 1. Convert Relational Data to Dictionary
+        resume_data = {
+            "contact_info": {
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "linkedin": None,
+                "website": None
+            },
+            "summary": "Experienced professional.", 
+            
+            "work_experience": [
+                {
+                    "company": w.company,
+                    "role": w.role,
+                    "location": w.location,
+                    "start_date": w.start_date,
+                    "end_date": w.end_date,
+                    "responsibilities": w.description.split('\n') if w.description else []
+                } for w in user.work_experiences
+            ],
+            "projects": [
+                {
+                    "name": p.name,
+                    "role": p.role,
+                    "date": f"{p.start_date} - {p.end_date}" if p.start_date else "",
+                    "tech_stack": p.tech_stack,
+                    "details": p.details.split('\n') if p.details else []
+                } for p in user.projects
+            ],
+            "education": [
+                {
+                    "institution": e.institution,
+                    "degree": e.degree,
+                    "graduation_date": e.graduation_date or e.end_date
+                } for e in user.educations
+            ],
+            "languages": [
+                {"name": l.name, "level": l.proficiency} for l in user.languages
+            ],
+            "skills": {
+                "technical": [s.name for s in user.skills_list if s.category == 'technical'],
+                "soft": [s.name for s in user.skills_list if s.category == 'soft']
+            }
+        }
+        
+        # 2. Call LLM to Tailor Content
+        model = genai.GenerativeModel(
+            'gemini-2.0-flash-lite-preview-02-05',
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+        prompt = f"""
+        Role: Expert Resume Writer.
+        Task: Tailor the following resume JSON for this Job Description.
+        
+        Goal: 
+        - Rewrite the 'summary' to highlight relevant experience.
+        - Rewrite 'responsibilities' in 'work_experience' to emphasize JD keywords.
+        - Select relevant 'projects' and highlight their relevance.
+        - KEEP data factual (do not invent jobs).
+        - RETURN the FULL JSON structure tailored.
+        - Do not add fake experience.
+        
+        JOB DESCRIPTION:
+        {job_description}
+        
+        RESUME JSON:
+        {json.dumps(resume_data)}
+        """
+        
+        try:
+            response = model.generate_content(prompt)
+            tailored_data = json.loads(response.text)
+            logger.info("✅ Tailored resume data generated successfully")
+        except Exception as e:
+            logger.error(f"Error tailoring resume: {e}")
+            logger.error(f"Raw LLM response: {response.text if 'response' in locals() else 'No response'}")
+            # Fallback to original if tailoring fails
+            tailored_data = resume_data
+            
+        # 3. Compile PDF
+        logger.info("📝 Compiling PDF with Typst...")
+        try:
+            return self._compile_pdf(tailored_data)
+        except Exception as e:
+             logger.error(f"❌ Typst Compilation Error: {e}")
+             # Dump data for debugging
+             logger.error(f"Data causing error: {json.dumps(tailored_data, indent=2)}")
+             raise e
 
 # Singleton instance
 _resume_service_instance = None

@@ -3,7 +3,7 @@
 
 @theme {
     --font-sans: "Inter", "Satoshi", ui-sans-serif, system-ui, sans-serif;
-    --font-serif: "Tiempos Headline", "Canela", "Fraunces", ui-serif, serif;
+    --font-serif: "Fraunces", "Tiempos Headline", "Canela", ui-serif, serif;
 
     /* Billion Dollar Palette */
     --color-background: #F9FAFB;
