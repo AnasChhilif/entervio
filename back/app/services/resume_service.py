@@ -247,7 +247,7 @@ class ResumeParserService:
         - KEEP data factual (do not invent jobs).
         - RETURN the FULL JSON structure tailored.
         - Do not add fake experience.
-        
+        - the resume must be in the same language as the job description.
         JOB DESCRIPTION:
         {job_description}
         
