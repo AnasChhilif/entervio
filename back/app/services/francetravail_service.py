@@ -34,24 +34,38 @@ class FranceTravailService:
             self.token_expiry = time.time() + data["expires_in"] - 60
             return self.access_token
 
-    async def search_jobs(self, keywords: str, location: Optional[str] = None) -> List[Dict]:
+    async def search_jobs(self, keywords: str, location: Optional[str] = None, distance: int = 25, **kwargs) -> List[Dict]:
         token = await self._get_access_token()
         
         params = {
             "motsCles": keywords,
             "range": "0-49" # Limit to 50 results
         }
+        
+        # Add advanced filters
+        if kwargs.get("contract_type"):
+            params["typeContrat"] = kwargs["contract_type"] # e.g. "CDI", "CDD"
+            
+        if kwargs.get("is_full_time") is not None:
+             params["tempsPlein"] = "true" if kwargs["is_full_time"] else "false"
+             
+        if kwargs.get("sort_by") == "date":
+            params["sort"] = 1
+        
         if location:
             # If location is a zip code or INSEE code (5 digits), use it directly
             # Otherwise, we assume it's a code passed from SmartJobService
             # The caller (SmartJobService) is responsible for resolving names to codes.
             
-            if location == "75056" or location.startswith("75"):
+            if location.isdigit() and len(location) == 2:
+                # If 2 digits, treat as department code (e.g. "33" for Gironde)
+                params["departement"] = location
+            elif location == "75056" or location.startswith("75"):
                 # Special case for Paris: use department 75 if it's Paris
                 params["departement"] = "75"
             else:
                 params["commune"] = location
-                params["distance"] = 10 # Default to 10km radius
+                params["distance"] = distance
         
         print(f"DEBUG: Searching France Travail with params: {params}")
 

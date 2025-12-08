@@ -26,7 +26,7 @@ anthropic==0.34.2
 google-generativeai>=0.8.0
 
 # Voice Chat - Groq Solution (Python 3.13 compatible!)
-groq==0.11.0
+groq>=0.13.0
 websockets==12.0
 edge-tts==7.0.0
 
@@ -41,3 +41,4 @@ spacy==3.8.11
 email-validator==2.3.0
 numpy
 typst==0.14.4
+fastmcp==0.1.1

@@ -5,7 +5,9 @@ import numpy as np
 import logging
 from app.core.config import settings
 import json
+from groq import Groq
 
+from app.mcp.server import search_jobs
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -104,16 +106,28 @@ def get_system_prompt(interviewer_type: InterviewerType, candidate_context: str 
 
 class LLMService:
     def __init__(self):
-        """Initialize with Google Gemini using settings from config."""
+        """Initialize with Google Gemini and Groq using settings from config."""
         logger.info("🔄 Initializing LLMService...")
         
-        # Get API key from settings
+        # Get API keys
         api_key = settings.GEMINI_API_KEY
+        groq_api_key = settings.GROQ_API_KEY
         
+        # Initialize Groq
+        self.groq_client = None
+        if groq_api_key:
+            try:
+                self.groq_client = Groq(api_key=groq_api_key)
+                logger.info("✅ Groq client initialized successfully!")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize Groq client: {str(e)}")
+        else:
+            logger.warning("⚠️ GROQ_API_KEY not configured. Groq features will not work.")
+
         if not api_key:
             logger.warning(
                 "⚠️  GEMINI_API_KEY not configured. "
-                "LLM features will not work. Add GEMINI_API_KEY to .env"
+                "LLM features (Gemini) will not work. Add GEMINI_API_KEY to .env"
             )
             self.api_key = None
             self.client_ready = False
@@ -132,21 +146,30 @@ class LLMService:
             self.client_ready = False
             self.api_key = None
     
-    def _create_model(self, interviewer_type: InterviewerType, candidate_context: str = "", job_description: str = ""):
-        """Create a Gemini model with the appropriate system prompt."""
+    def _create_model(self, interviewer_type: InterviewerType = None, candidate_context: str = "", job_description: str = "", tools: List[Any] = None):
+        """Create a Gemini model with the appropriate system prompt and tools."""
         if not self.client_ready:
             raise ValueError("Gemini client not initialized. Please set GEMINI_API_KEY in .env")
-        system_prompt = get_system_prompt(interviewer_type, candidate_context, job_description)
+        
+        system_prompt = None
+        if interviewer_type:
+            system_prompt = get_system_prompt(interviewer_type, candidate_context, job_description)
+            
+        model_config = {}
+        if tools:
+            model_config['tools'] = tools
+
         return genai.GenerativeModel(
-            'gemini-2.0-flash-lite-preview-02-05',
-            system_instruction=system_prompt
+            'gemini-1.5-flash',
+            system_instruction=system_prompt,
+            **model_config
         )
 
     def _create_grading_model(self, interviewer_type: InterviewerType):
         """Create a gemini model to grade the user responses"""
         system_prompt = get_system_prompt(interviewer_type)
         return genai.GenerativeModel(
-            'gemini-2.0-flash-lite-preview-02-05',
+            'gemini-1.5-flash',
             system_instruction=system_prompt,
             generation_config={
                 "response_mime_type": "application/json"
@@ -489,14 +512,15 @@ Présentez-vous. Et soyez synthétique."""
 
     async def extract_keywords_from_query(self, query: str, user_context: str = "") -> Dict[str, Any]:
         """
-        Extract search keywords and location from a natural language query using LLM,
+        Extract search keywords and location from a natural language query using Groq/Llama3,
         considering the user's professional context.
         """
         logger.info(f"🔍 Extracting keywords from query: '{query}' with context length: {len(user_context)}")
         
         try:
-            model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05')
-            
+            if not self.groq_client:
+                raise ValueError("Groq client not initialized")
+
             prompt = f"""Role: You are an expert Technical Recruiter in France.
                         Task: Analyze the user's profile and query to generate optimized search parameters for the French job market (France Travail / APEC).
 
@@ -512,25 +536,150 @@ Présentez-vous. Et soyez synthétique."""
                         - Variation 1: Precise Title (e.g., "Développeur React Senior")
                         - Variation 2: Broader Title (e.g., "Ingénieur Frontend")
                         - Variation 3: Tech Stack Focus (e.g., "React.js Confirmé")
-                        3. LOCATION: Extract the city name. 
+                        3. LOCATION: Extract the city name or zip code if explicitly mentioned.
+                        - CRITICAL: IF NO LOCATION IS MENTIONED IN THE QUERY, Do not include it.
+                        - DO NOT assume specific cities unless the user asks.
 
                         Output JSON format strictly:
                         {{
                         "keywords": ["Variation 1", "Variation 2", "Variation 3"],
-                        "location": "Paris",
+                        "location": "Paris" or null,
                         }}"""
             
-            response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
-            result = json.loads(response.text)
-            print(result)
+            completion = self.groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that outputs JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            
+            result_text = completion.choices[0].message.content
+            result = json.loads(result_text)
             
             logger.info(f"✅ Extracted: {result}")
             return result
             
         except Exception as e:
-            logger.error(f"❌ Error extracting keywords: {str(e)}")
+            logger.error(f"❌ Error extracting keywords with Groq: {str(e)}")
             # Fallback
             return {"keywords": query.split()[:3], "location": None}
+
+    async def search_with_tools(self, user_query: str, user_context: str, tools: List[Any]) -> List[Dict]:
+        """
+        Perform a search using Groq tool calling (OpenAI compatible).
+        """
+        logger.info(f"🛠️ Starting search with tools (Groq) for query: '{user_query}'")
+        
+        try:
+            if not self.groq_client:
+                raise ValueError("Groq client not initialized")
+ 
+            # OpenAI/Groq Tool Definition
+            tools_schema = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search_jobs",
+                        "description": "Search for jobs in France using France Travail API with advanced filters.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string", 
+                                    "description": "Job title, keywords, or domain (e.g. 'Développeur Python')"
+                                },
+                                "location": {
+                                    "type": "string",
+                                    "description": "City name or zip code (e.g. 'Paris', '69002'). Omit this parameter if no location is specified."
+                                },
+                                "contract_type": {
+                                    "type": "string",
+                                    "enum": ["CDI", "CDD", "MIS", "ALE", "DDI", "DIN"],
+                                    "description": "Type of contract. Omit if not specified."
+                                },
+                                "is_full_time": {
+                                    "type": "boolean",
+                                    "description": "Set to true if user specifically asks for full-time work. Omit otherwise."
+                                },
+                                "sort_by": {
+                                    "type": "string",
+                                    "enum": ["date", "relevance"],
+                                    "description": "Sort order. Omit if not specified."
+                                }
+                            },
+                            "required": ["query"]
+                        }
+                    }
+                }
+            ]
+
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs. Use the 'search_jobs' tool. Analyze the user's query and profile to pick the best keywords (in French) and location.\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated."
+                },
+                {
+                    "role": "user",
+                    "content": user_query
+                }
+            ]
+
+            response = self.groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                tools=tools_schema,
+                tool_choice="auto",
+                max_tokens=4096 
+            )
+
+            response_message = response.choices[0].message
+            tool_calls = response_message.tool_calls
+            
+            all_found_jobs = []
+
+            if tool_calls:
+                logger.info(f"🤖 Groq decided to call {len(tool_calls)} tools")
+                
+                # Execute tool calls
+                for tool_call in tool_calls:
+                    function_name = tool_call.function.name
+                    if function_name == "search_jobs":
+                        function_args = json.loads(tool_call.function.arguments)
+                        logger.info(f"📞 Calling search_jobs with: {function_args}")
+                        
+                        # Call the tool function (it's underlying function is async)
+                        # We pass keywords and location. search_jobs is a FastMCP tool, so use .fn
+                        query = function_args.get("query")
+                        location = function_args.get("location")
+                        contract_type = function_args.get("contract_type")
+                        is_full_time = function_args.get("is_full_time")
+                        sort_by = function_args.get("sort_by")
+                        
+                        # Call the imported function
+                        # search_jobs returns a JSON string
+                        jobs_json = await search_jobs.fn(
+                            query=query, 
+                            location=location,
+                            contract_type=contract_type,
+                            is_full_time=is_full_time,
+                            sort_by=sort_by
+                        )
+                        
+                        try:
+                            jobs = json.loads(jobs_json)
+                            if isinstance(jobs, list):
+                                all_found_jobs.extend(jobs)
+                        except Exception as e:
+                            logger.error(f"❌ Failed to parse jobs JSON from tool: {e}")
+
+            logger.info(f"✅ Extracted {len(all_found_jobs)} jobs from tool execution")
+            return all_found_jobs
+            
+        except Exception as e:
+            logger.error(f"❌ Error in search_with_tools (Groq): {str(e)}")
+            return []
 
 # Singleton instance - initialized on first import
 _llm_service_instance = None

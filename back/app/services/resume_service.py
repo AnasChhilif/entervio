@@ -231,11 +231,12 @@ class ResumeParserService:
         }
         
         # 2. Call LLM to Tailor Content
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash-lite-preview-02-05',
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
+        from app.services.llm_service import llm_service
+        if not llm_service.groq_client:
+             raise ValueError("Groq client not initialized")
+
+        from app.services.llm_service import llm_service
+
         prompt = f"""
         Role: Expert Resume Writer.
         Task: Tailor the following resume JSON for this Job Description.
@@ -256,9 +257,16 @@ class ResumeParserService:
         """
         
         try:
-            response = model.generate_content(prompt)
-            tailored_data = json.loads(response.text)
-            logger.info("✅ Tailored resume data generated successfully")
+            completion = llm_service.groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are an expert resume writer that outputs JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            tailored_data = json.loads(completion.choices[0].message.content)
+            logger.info("✅ Tailored resume data generated successfully with Groq")
         except Exception as e:
             logger.error(f"Error tailoring resume: {e}")
             logger.error(f"Raw LLM response: {response.text if 'response' in locals() else 'No response'}")

@@ -9,11 +9,15 @@ class LocationService:
             return []
 
         params = {
-            "nom": query,
             "fields": "nom,code,codesPostaux,departement,region",
             "boost": "population",
             "limit": 10
         }
+
+        if query.isdigit() and len(query) == 5:
+            params["codePostal"] = query
+        else:
+            params["nom"] = query
 
         async with httpx.AsyncClient() as client:
             try:
