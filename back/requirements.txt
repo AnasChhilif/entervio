@@ -41,4 +41,4 @@ spacy==3.8.11
 email-validator==2.3.0
 numpy
 typst==0.14.4
-fastmcp==0.1.1
+fastmcp==2.13.3
