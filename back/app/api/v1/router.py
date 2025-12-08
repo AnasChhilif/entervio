@@ -5,6 +5,7 @@ from app.api.v1.endpoints import voice_chat
 from app.api.v1.endpoints import candidates
 from app.api.v1.endpoints import auth
 from app.api.v1.endpoints import jobs
+from app.api.v1.endpoints import resume
 from app.core.auth import get_current_user
 
 api_router = APIRouter()
@@ -29,10 +30,17 @@ protected_router.include_router(
     tags=["candidates"],
 )
 
-api_router.include_router(auth.router)
-api_router.include_router(protected_router)
 api_router.include_router(
     jobs.router,
     prefix="/jobs",
     tags=["jobs"],
 )
+
+api_router.include_router(
+    resume.router,
+    prefix="/resume",
+    tags=["resume"],
+)
+
+api_router.include_router(auth.router)
+api_router.include_router(protected_router)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
-import { MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp, ArrowRight, Search, CheckCircle2 } from "lucide-react";
+import { MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp, ArrowRight, Search, CheckCircle2, FileText, Loader2, Download } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
@@ -44,7 +44,7 @@ function formatSalary(salary: string): string {
     try {
         // Extract numbers (handle 35000.0, 35000, 35 000)
         const matches = salary.replace(/\s/g, '').match(/(\d+(?:[\.,]\d+)?)/g);
-        
+
         if (matches && matches.length >= 1) {
             // Parse numbers (replace comma with dot if needed)
             const nums = matches.map(m => parseFloat(m.replace(',', '.')));
@@ -58,7 +58,7 @@ function formatSalary(salary: string): string {
 
             const lowerSalary = salary.toLowerCase();
             let period = "";
-            
+
             if (lowerSalary.includes("annuel") || lowerSalary.includes("an")) period = "/ an";
             else if (lowerSalary.includes("mensuel") || lowerSalary.includes("mois")) period = "/ mois";
             else if (lowerSalary.includes("horaire") || lowerSalary.includes("heure")) period = "/ h";
@@ -75,6 +75,160 @@ function formatSalary(salary: string): string {
 }
 
 // --- Components ---
+
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "~/components/ui/dialog";
+
+function TailorResumeDialog({ jobDescription, jobTitle }: { jobDescription: string, jobTitle: string }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [step, setStep] = useState<'idle' | 'generating' | 'preview'>('idle');
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [loadingMessage, setLoadingMessage] = useState("");
+
+    const messages = [
+        "Analyse de l'offre...",
+        "Extraction des compétences clés...",
+        "Adaptation du profil...",
+        "Rédaction des accroches...",
+        "Génération du PDF..."
+    ];
+
+    // Cleanup blob URL when dialog closes
+    useEffect(() => {
+        if (!isOpen && pdfUrl) {
+            window.URL.revokeObjectURL(pdfUrl);
+            setPdfUrl(null);
+            setStep('idle');
+        }
+    }, [isOpen]);
+
+    const handleGenerate = async () => {
+        setStep('generating');
+        let msgIndex = 0;
+        setLoadingMessage(messages[0]);
+
+        // Cycle through messages while loading
+        const interval = setInterval(() => {
+            msgIndex = (msgIndex + 1) % messages.length;
+            setLoadingMessage(messages[msgIndex]);
+        }, 1500);
+
+        try {
+            const blob = await jobsService.tailorResume(jobDescription);
+            const url = window.URL.createObjectURL(blob);
+            setPdfUrl(url);
+            setStep('preview');
+        } catch (error) {
+            console.error("Failed to tailor resume:", error);
+            alert("Erreur lors de la génération du CV. Veuillez réessayer.");
+            setStep('idle');
+        } finally {
+            clearInterval(interval);
+        }
+    };
+
+    const handleDownload = () => {
+        if (!pdfUrl) return;
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        a.download = `CV_Tailored_${jobTitle.replace(/[^a-z0-9]/gi, '_').substring(0, 20)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setIsOpen(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-full h-12 px-6 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
+                >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Adapter mon CV
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden bg-white">
+                <DialogHeader className="px-6 py-4 border-b border-gray-100 bg-white z-10">
+                    <DialogTitle className="flex items-center gap-2 text-xl font-serif">
+                        <Sparkles className="w-5 h-5 text-emerald-500" />
+                        CV Sur-Mesure
+                    </DialogTitle>
+                    <DialogDescription>
+                        Générez une version de votre CV parfaitement alignée avec ce poste.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 bg-gray-50/50 relative overflow-hidden flex flex-col">
+                    {step === 'idle' && (
+                        <div className="flex flex-col items-center justify-center h-full p-12 text-center text-gray-500 space-y-6">
+                            <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-2">
+                                <Sparkles className="w-10 h-10 text-emerald-500" />
+                            </div>
+                            <div className="max-w-md space-y-2">
+                                <h3 className="text-lg font-serif text-gray-900">Prêt à impressionner ?</h3>
+                                <p>
+                                    Notre IA va analyser l'offre <strong>{jobTitle}</strong> et réécrire votre CV
+                                    pour mettre en avant vos expériences les plus pertinentes.
+                                </p>
+                            </div>
+                            <Button onClick={handleGenerate} size="lg" className="rounded-full px-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200/50">
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Générer mon CV Spécifique
+                            </Button>
+                        </div>
+                    )}
+
+                    {step === 'generating' && (
+                        <div className="flex flex-col items-center justify-center h-full p-12 text-center space-y-8 animate-in fade-in duration-500">
+                            <div className="relative">
+                                <div className="w-24 h-24 border-4 border-gray-100 border-t-emerald-500 rounded-full animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Sparkles className="w-8 h-8 text-emerald-500 animate-pulse" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-serif font-bold text-gray-900">{loadingMessage}</h3>
+                                <p className="text-sm text-gray-500">Cela peut prendre quelques secondes...</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'preview' && pdfUrl && (
+                        <div className="w-full h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <iframe
+                                src={pdfUrl}
+                                className="w-full flex-1 border-0 bg-gray-100"
+                                title="Resume Preview"
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter className="px-6 py-4 border-t border-gray-100 bg-white">
+                    <Button variant="ghost" onClick={() => setIsOpen(false)}>
+                        Annuler
+                    </Button>
+                    {step === 'preview' && (
+                        <Button onClick={handleDownload} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                            <Download className="w-4 h-4 mr-2" />
+                            Télécharger le PDF
+                        </Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function JobCard({ job, isSelected, onClick }: { job: JobOffer; isSelected: boolean; onClick: () => void }) {
     const matchColor = job.relevance_score && job.relevance_score >= 80 ? "bg-emerald-500" : "bg-yellow-500";
@@ -94,12 +248,12 @@ function JobCard({ job, isSelected, onClick }: { job: JobOffer; isSelected: bool
 
             <div className="flex justify-between items-start gap-3 mb-1">
                 <h3 className={cn(
-                    "font-serif font-bold text-lg leading-tight transition-colors text-gray-900",
+                    "font-bold text-lg leading-tight transition-colors text-gray-900",
                     isSelected && "text-primary"
                 )}>
                     {job.intitule}
                 </h3>
-                
+
                 {/* Match Score: Badge of Honor */}
                 {job.relevance_score !== undefined && (
                     <div className={cn("shrink-0 font-bold text-sm flex items-center gap-1", matchTextColor)}>
@@ -127,15 +281,15 @@ function JobCard({ job, isSelected, onClick }: { job: JobOffer; isSelected: bool
 
             {/* Inline AI Insight */}
             {job.relevance_reasoning && (
-                <div className="flex items-start gap-2 text-sm text-gray-600 font-serif italic leading-relaxed">
+                <div className="flex items-start gap-2 text-sm text-gray-600 font-bold leading-relaxed">
                     <Sparkles className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                     <p className="line-clamp-2">{job.relevance_reasoning}</p>
                 </div>
             )}
-            
+
             {/* Arrow Action (Hidden by default, visible on hover/select) */}
             <div className="absolute right-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                 <ArrowRight className="w-5 h-5 text-gray-400" />
+                <ArrowRight className="w-5 h-5 text-gray-400" />
             </div>
         </div>
     );
@@ -172,7 +326,7 @@ function JobDetail({ job }: { job: JobOffer | null }) {
                 {/* Title & Actions */}
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
                     <div>
-                        <h1 className="text-3xl md:text-4xl font-serif font-bold text-gray-900 leading-tight mb-2">
+                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight mb-2">
                             {job.intitule}
                         </h1>
                         <div className="flex items-center gap-2 text-lg text-gray-600">
@@ -181,15 +335,19 @@ function JobDetail({ job }: { job: JobOffer | null }) {
                             <span>{job.lieuTravail.libelle}</span>
                         </div>
                     </div>
-                    
-                    {applyUrl && (
-                        <Button asChild size="lg" className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 h-12 text-base font-medium transition-transform hover:-translate-y-0.5">
-                            <a href={applyUrl} target="_blank" rel="noopener noreferrer">
-                                Postuler
-                                <ExternalLink className="w-4 h-4 ml-2" />
-                            </a>
-                        </Button>
-                    )}
+
+                    <div className="flex gap-3 shrink-0">
+                        <TailorResumeDialog jobDescription={job.description} jobTitle={job.intitule} />
+
+                        {applyUrl && (
+                            <Button asChild size="lg" className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 h-12 text-base font-medium transition-transform hover:-translate-y-0.5">
+                                <a href={applyUrl} target="_blank" rel="noopener noreferrer">
+                                    Postuler
+                                    <ExternalLink className="w-4 h-4 ml-2" />
+                                </a>
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* AI Analysis */}
@@ -200,6 +358,11 @@ function JobDetail({ job }: { job: JobOffer | null }) {
                                 <Sparkles className="w-4 h-4 text-emerald-700" />
                             </div>
                             <h3 className="font-bold text-emerald-900 text-sm uppercase tracking-wide">Pourquoi ça matche</h3>
+                            {job.relevance_score !== undefined && (
+                                <span className="ml-auto bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                    {job.relevance_score}% Match
+                                </span>
+                            )}
                         </div>
                         <div className="prose prose-sm max-w-none text-emerald-900/80 leading-relaxed">
                             <p>{job.relevance_reasoning}</p>
@@ -229,7 +392,7 @@ function JobDetail({ job }: { job: JobOffer | null }) {
 
                 {/* Description */}
                 <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed">
-                    <h3 className="font-serif font-bold text-gray-900 text-xl mb-4">Description du poste</h3>
+                    <h3 className=" font-bold text-gray-900 text-xl mb-4">Description du poste</h3>
                     <p className="whitespace-pre-line">{job.description}</p>
                 </div>
             </div>
@@ -319,7 +482,7 @@ export default function JobsSearch() {
                             </div>
                         </div>
                     </div>
-                    
+
                     {/* Quick Chips */}
                     <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
                         {quickChips.map((chip) => (
@@ -344,9 +507,9 @@ export default function JobsSearch() {
                                     <span className="text-sm font-medium text-gray-500">{jobs.length} résultats</span>
                                 </div>
                                 {jobs.map((job) => (
-                                    <JobCard 
-                                        key={job.id} 
-                                        job={job} 
+                                    <JobCard
+                                        key={job.id}
+                                        job={job}
                                         isSelected={selectedJobId === job.id}
                                         onClick={() => {
                                             setSelectedJobId(job.id);

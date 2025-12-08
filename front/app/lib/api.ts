@@ -474,7 +474,7 @@ export const authApi = {
     return response.json();
   },
 
-  async getMe(): Promise<{ id: number; email: string; name: string; has_resume: boolean; candidate_id?: number }> {
+  async getMe(): Promise<{ id: number; email: string; name: string; has_resume: boolean }> {
     const response = await fetch(`${API_BASE_URL}/auth/me`, withAuthHeaders());
 
     if (!response.ok) {

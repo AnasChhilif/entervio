@@ -102,7 +102,6 @@ class UserProfileResponse(BaseModel):
     email: EmailStr
     name: str
     has_resume: bool
-    candidate_id: Optional[int] = None
 
 
 @router.get("/me", response_model=UserProfileResponse)
@@ -114,6 +113,5 @@ async def get_me(user: User = Depends(get_current_db_user)):
         id=user.id,
         email=user.email,
         name=user.name,
-        has_resume=bool(user.parsed_data),
-        candidate_id=user.id if user.parsed_data else None
+        has_resume=bool(user.raw_resume_text)
     )

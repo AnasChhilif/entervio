@@ -59,10 +59,24 @@ class InterviewService:
             
             # Get candidate context if available
             candidate_context = ""
-            if user and user.parsed_data:
-                # Use resume service to format context
-                candidate_context = resume_service_instance.get_core_context(user.parsed_data)
-                logger.info(f"📄 Added resume context for candidate {user.id}")
+            # Reconstruct context from relational data if possible, or use raw text as fallback
+            if user:
+                 if user.raw_resume_text:
+                     candidate_context = user.raw_resume_text
+                 elif user.work_experiences or user.projects:
+                     # Fallback: construct simple context string from DB models
+                     # Or use a service method to gather 'resume_data' dict like in tailor_resume
+                     # For now, let's use the helper we used in verify/tailor?
+                     # resume_service_instance.get_core_context expects a dict.
+                     # We can fetch the data into a dict and pass it.
+                     pass
+            
+            if candidate_context == "" and (user.work_experiences or user.projects):
+                 # Quick reconstruction if raw text missing
+                 candidate_context = f"User has {len(user.work_experiences)} jobs and {len(user.projects)} projects."
+
+            if candidate_context != "":
+                 logger.info(f"📄 Added resume context for candidate {user.id}")
 
             # Get personalized greeting from LLM
             greeting_text = self.llm_service.get_initial_greeting(

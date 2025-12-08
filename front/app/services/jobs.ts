@@ -49,6 +49,33 @@ export const jobsService = {
         const response = await api.get(`/jobs/locations?${params.toString()}`);
         return response.data;
     },
+
+    tailorResume: async (jobDescription: string): Promise<Blob> => {
+        const user = await api.get("/auth/me").then(r => r.data).catch(() => null);
+        if (!user) throw new Error("User not authenticated");
+
+        // We use fetch directly because api.post expects JSON response
+        const token = window.localStorage.getItem("supabase.access_token");
+        const headers: HeadersInit = {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        };
+
+        const response = await fetch("/api/v1/resume/tailor", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                user_id: user.id,
+                job_description: jobDescription
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to tailor resume: ${response.status}`);
+        }
+
+        return response.blob();
+    }
 };
 
 export interface City {

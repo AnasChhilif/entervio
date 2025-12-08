@@ -1,0 +1,29 @@
+/app/app/core/config.py:17: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  DATABASE_URL: str = Field(
+/app/app/core/config.py:29: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  SUPABASE_URL: str = Field(default="", env="SUPABASE_URL")
+/app/app/core/config.py:30: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  SUPABASE_ANON_KEY: str = Field(default="", env="SUPABASE_ANON_KEY")
+/app/app/core/config.py:31: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  SUPABASE_JWT_SECRET: str = Field(default="", env="SUPABASE_JWT_SECRET")
+/app/app/core/config.py:32: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  SUPABASE_JWT_AUDIENCE: str = Field(default="authenticated", env="SUPABASE_JWT_AUDIENCE")
+/app/app/core/config.py:33: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  SUPABASE_SERVICE_ROLE_KEY: str = Field(default="", env="SUPABASE_SERVICE_ROLE_KEY")
+/app/app/core/config.py:38: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  GROQ_API_KEY: str = Field(default="", env="GROQ_API_KEY")
+/app/app/core/config.py:39: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
+/app/app/core/config.py:42: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  FRANCE_TRAVAIL_CLIENT_ID: str = Field(default="", env="FRANCE_TRAVAIL_CLIENT_ID")
+/app/app/core/config.py:43: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  FRANCE_TRAVAIL_CLIENT_SECRET: str = Field(default="", env="FRANCE_TRAVAIL_CLIENT_SECRET")
+/app/app/core/config.py:46: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+  USE_ELEVENLABS: bool = Field(default=False, env="USE_ELEVENLABS")
+/app/app/db/database.py:15: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  Base = declarative_base()
+Warning: Spacy model not found.
+Tool Object Type: <class 'fastmcp.tools.tool.FunctionTool'>
+Original Function: <function search_jobs at 0x7f5592701580>
+Original Function Name: search_jobs
+Iterating tool: [('name', 'search_jobs'), ('title', None), ('description', 'Search for jobs in France using the France Travail API.\n\nArgs:\n    query: The job title, keywords or domain to search for (e.g., "Developer", "Marketing", "Python").\n    location: The location name or code (e.g., "Paris", "75001").\n    \nReturns:\n    A formatted string containing the list of job offers found.'), ('icons', None), ('tags', set()), ('meta', None), ('enabled', True), ('parameters', {'properties': {'query': {'type': 'string'}, 'location': {'anyOf': [{'type': 'string'}, {'type': 'null'}], 'default': None}}, 'required': ['query'], 'type': 'object'}), ('output_schema', {'properties': {'result': {'type': 'string'}}, 'required': ['result'], 'type': 'object', 'x-fastmcp-wrap-result': True}), ('annotations', None), ('serializer', None), ('fn', <function search_jobs at 0x7f5592701580>)]
