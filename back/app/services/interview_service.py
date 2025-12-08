@@ -192,7 +192,7 @@ class InterviewService:
                 candidate_context=candidate_context,
                 job_description=interview.job_description,
             )
-            logger.info(f"✅ LLM response: {llm_response[:100]}...")
+            logger.info(f"LLM response: {llm_response[:100]}...")
 
             # Step 5: Create new question-answer record
             qa = QuestionAnswer(
@@ -205,19 +205,14 @@ class InterviewService:
             db.add(qa)
             db.commit()
 
-            # Step 6: Trigger background grading (non-blocking)
-            # This will run asynchronously and update the database when complete
             if last_qa and last_qa.answer:
-                asyncio.create_task(
-                    self.grading_service.grade_and_update(
-                        db=db,
-                        qa_id=last_qa.id,
-                        question=last_qa.question,
-                        answer=last_qa.answer,
-                        interviewer_style=interview.interviewer_style,
-                    )
+                grading_service.grade_and_update_async(
+                    qa_id=last_qa.id,
+                    question=last_qa.question,
+                    answer=last_qa.answer,
+                    interviewer_style=interview.interviewer_style,
                 )
-                logger.info(f"🚀 Background grading task started for QA {last_qa.id}")
+                logger.info(f"Background grading task started for QA {last_qa.id}")
 
             return {
                 "transcription": transcribed_text,
@@ -229,7 +224,7 @@ class InterviewService:
 
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Error processing response: {str(e)}")
+            logger.error(f"Error processing response: {str(e)}")
             raise
 
     async def end_interview(self, db: Session, interview_id: int) -> dict:
