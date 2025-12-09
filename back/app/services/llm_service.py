@@ -8,9 +8,57 @@ from typing import Any, Literal
 import google.generativeai as genai
 import numpy as np
 from groq import Groq
+from pydantic import BaseModel, field_validator
 
 from app.core.config import settings
 from app.mcp.server import search_jobs
+
+
+class SearchJobsArgs(BaseModel):
+    """Pydantic model for validating LLM search_jobs tool call arguments."""
+
+    query: str
+    location: str | None = None
+    contract_type: Literal["CDI", "CDD", "MIS", "ALE", "DDI", "DIN"] | None = None
+    is_full_time: bool | None = None
+    sort_by: Literal["date", "relevance"] | None = None
+    experience: Literal["0", "1", "2", "3"] | None = None
+    experience_exigence: Literal["D", "S", "E"] | None = None
+    grand_domaine: (
+        Literal[
+            "A",
+            "B",
+            "C",
+            "C15",
+            "D",
+            "E",
+            "F",
+            "G",
+            "H",
+            "I",
+            "J",
+            "K",
+            "L",
+            "L14",
+            "M",
+            "M13",
+            "M14",
+            "M15",
+            "M16",
+            "M17",
+            "M18",
+            "N",
+        ]
+        | None
+    ) = None
+
+    @field_validator("query")
+    @classmethod
+    def query_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("query must not be empty")
+        return v.strip()
+
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -542,6 +590,44 @@ Présentez-vous. Et soyez synthétique.""",
                                     "enum": ["date", "relevance"],
                                     "description": "Sort order. Omit if not specified.",
                                 },
+                                "experience": {
+                                    "type": "string",
+                                    "enum": ["0", "1", "2", "3"],
+                                    "description": "Experience level: '0' (not specified), '1' (<1 year/junior), '2' (1-3 years/mid), '3' (>3 years/senior). Infer from user context or explicit request.",
+                                },
+                                "experience_exigence": {
+                                    "type": "string",
+                                    "enum": ["D", "S", "E"],
+                                    "description": "Experience requirement: 'D' (beginner/débutant accepted), 'S' (experience desired/souhaitée), 'E' (experience required/exigée). Use 'D' for juniors, 'E' for seniors.",
+                                },
+                                "grand_domaine": {
+                                    "type": "string",
+                                    "enum": [
+                                        "A",
+                                        "B",
+                                        "C",
+                                        "C15",
+                                        "D",
+                                        "E",
+                                        "F",
+                                        "G",
+                                        "H",
+                                        "I",
+                                        "J",
+                                        "K",
+                                        "L",
+                                        "L14",
+                                        "M",
+                                        "M13",
+                                        "M14",
+                                        "M15",
+                                        "M16",
+                                        "M17",
+                                        "M18",
+                                        "N",
+                                    ],
+                                    "description": "Domain code to filter by sector. Key codes: M18=IT/Tech, D=Sales, H=Industry, J=Health, K=Services, F=Construction, N=Transport, M14=Consulting. Use to narrow results.",
+                                },
                             },
                             "required": ["query"],
                         },
@@ -552,10 +638,51 @@ Présentez-vous. Et soyez synthétique.""",
             messages = [
                 {
                     "role": "system",
-                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs using the 'search_jobs' tool.\n\nSTRATEGY: To ensure results, you MUST call the 'search_jobs' tool many TIMES in parallel with different keyword variations:\n1. Exact fit (e.g. 'Développeur Python')\n2. Broader term (e.g. 'Développeur Back-end')\n3. Alternative/English term (e.g. 'Python API')\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated.",
-                },
+                    "content": f"""
+                    You are a High-Performance Job Search Orchestrator. Your mission is to generate the optimal set of tool calls (up to 3) to maximize the retrieval of highly relevant job postings for the user.
+
+                    USER CONTEXT (Resume Data): {user_context}
+
+                    --- STRATEGY STEP 1: INTELLIGENT INFERENCE ---
+
+                    1.  **INFER CORE JOB TITLE:** Analyze the 'User Background'. Deduce the user's primary, most marketable professional role (e.g., "Software Engineer", "Full-Stack Developer", "Data Scientist"). This is the **[INFERRED_TITLE]**.
+                    2.  **INFER CORE SKILL:** Identify the user's most valuable technical skill (e.g., "Python", "React", "FastAPI"). This is the **[INFERRED_SKILL]**.
+                    3.  **DETERMINE EXPERIENCE FILTER:** Map the user's total experience or explicit request:
+                        * If explicit request is "junior," or total experience < 2 years, set experience='1' and experience_exigence='D'. (This is the **[EXP_FILTER]**).
+                        * Otherwise, OMIT experience filters.
+
+                    --- STRATEGY STEP 2: MANDATORY 3-CALL ORCHESTRATION ---
+
+                    Generate exactly **3 parallel tool calls**. This is non-negotiable for maximum coverage.
+
+                    * **CALL 1: HIGH PRECISION (Title + Filter)**
+                        * **Goal:** Capture jobs that are perfectly tagged.
+                        * **query:** Use the **[INFERRED_TITLE]** (or the user's explicit title).
+                        * **Filters:** Apply the **[EXP_FILTER]** determined in Step 1.
+                        * **CRITICAL CONSTRAINT:** **MUST NOT** include any experience keywords (e.g., "junior", "senior") in the 'query'.
+
+                    * **CALL 2: KEYWORD EXPANSION (Skill + Filter)**
+                        * **Goal:** Catch jobs that prioritize specific skills over the general title.
+                        * **query:** Use the **[INFERRED_SKILL]** (or a synonym like 'Typescript' if the skill is a framework like 'React').
+                        * **Filters:** Apply the **[EXP_FILTER]** determined in Step 1.
+
+                    * **CALL 3: BROAD FALLBACK (Recruitment Terms)**
+                        * **Goal:** Catch postings that use non-standard terminology or are poorly tagged, relying on the user's explicit term.
+                        * **query:** Use the user's **exact typed query** (e.g., "junior", "remote", "stage"). If the user's query is only a filter term, **COMBINE IT** with the **[INFERRED_TITLE]**.
+                            * *Example:* User says "junior" -> query="Full-Stack Developer junior"
+                        * **Filters:** OMIT *all* structured filters (experience, domain) for this call to maximize recall.
+
+                    --- FINAL GUIDELINES ---
+
+                    * **LOCATION/CONTRACT:** Omit location or contract_type unless **EXPLICITLY** requested by the user.
+                    * **VAGUE QUERY HANDLING:** If the user's typed query is vague (e.g., "cherche job"), use the **[INFERRED_TITLE]** for all three calls.
+                    * **OUTPUT:** Generate the JSON structure for 3 distinct calls to 'search_jobs'.
+                    """
+},
                 {"role": "user", "content": user_query},
             ]
+
+            logger.info(f"🤖 Groq decided to call {messages}")
 
             response = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
@@ -578,23 +705,34 @@ Présentez-vous. Et soyez synthétique.""",
                 for tool_call in tool_calls:
                     function_name = tool_call.function.name
                     if function_name == "search_jobs":
-                        function_args = json.loads(tool_call.function.arguments)
-                        logger.info(f"📞 Calling search_jobs with: {function_args}")
+                        try:
+                            raw_args = json.loads(tool_call.function.arguments)
+                            validated_args = SearchJobsArgs.model_validate(raw_args)
+                            logger.info(
+                                f"📞 Calling search_jobs with validated args: {validated_args.model_dump(exclude_none=True)}"
+                            )
+                        except json.JSONDecodeError as e:
+                            logger.error(
+                                f"❌ Failed to parse tool call arguments as JSON: {e}"
+                            )
+                            continue
+                        except Exception as e:
+                            logger.error(
+                                f"❌ Pydantic validation failed for search_jobs args: {e}"
+                            )
+                            continue
 
-                        query = function_args.get("query")
-                        location = function_args.get("location")
-                        contract_type = function_args.get("contract_type")
-                        is_full_time = function_args.get("is_full_time")
-                        sort_by = function_args.get("sort_by")
-
-                        # Call the imported function
+                        # Call the imported function with validated args
                         # search_jobs returns a JSON string
                         jobs_json = await search_jobs.fn(
-                            query=query,
-                            location=location,
-                            contract_type=contract_type,
-                            is_full_time=is_full_time,
-                            sort_by=sort_by,
+                            query=validated_args.query,
+                            location=validated_args.location,
+                            contract_type=validated_args.contract_type,
+                            is_full_time=validated_args.is_full_time,
+                            sort_by=validated_args.sort_by,
+                            experience=validated_args.experience,
+                            experience_exigence=validated_args.experience_exigence,
+                            grand_domaine=validated_args.grand_domaine,
                         )
 
                         try:
@@ -605,9 +743,13 @@ Présentez-vous. Et soyez synthétique.""",
                             logger.error(
                                 f"❌ Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}..."
                             )
-            unique_jobs = list({job["id"]: job for job in all_found_jobs if job.get("id")}.values())
+            unique_jobs = list(
+                {job["id"]: job for job in all_found_jobs if job.get("id")}.values()
+            )
 
-            logger.info(f"✅ Extracted {len(unique_jobs)} unique jobs from tool execution")
+            logger.info(
+                f"✅ Extracted {len(unique_jobs)} unique jobs from tool execution"
+            )
             return unique_jobs
 
         except Exception as e:

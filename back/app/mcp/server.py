@@ -26,6 +26,9 @@ async def search_jobs(
     contract_type: str | None = None,
     is_full_time: bool | None = None,
     sort_by: str | None = None,
+    experience: str | None = None,
+    experience_exigence: str | None = None,
+    grand_domaine: str | None = None,
 ) -> str:
     """
     Search for jobs in France using the France Travail API with advanced filters.
@@ -36,6 +39,9 @@ async def search_jobs(
         contract_type: Type of contract (e.g. "CDI", "CDD", "MIS", "DDI", "DIN").
         is_full_time: True for full-time only.
         sort_by: "date" or "relevance".
+        experience: Experience level required: "0" (not specified), "1" (<1 year), "2" (1-3 years), "3" (>3 years).
+        experience_exigence: Experience requirement: "D" (beginner accepted), "S" (experience desired), "E" (experience required).
+        grand_domaine: Domain code (e.g. "M18" for IT/Telecom, "D" for Sales, "H" for Industry, "K" for Services, "J" for Health).
     """
     try:
         # Resolve location code
@@ -52,6 +58,9 @@ async def search_jobs(
             contract_type=contract_type,
             is_full_time=is_full_time,
             sort_by=sort_by,
+            experience=experience,
+            experience_exigence=experience_exigence,
+            grand_domaine=grand_domaine,
         )
 
         if not jobs:

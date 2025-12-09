@@ -1,8 +1,11 @@
+import logging
 import time
 
 import httpx
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class FranceTravailService:
@@ -56,6 +59,18 @@ class FranceTravailService:
         if kwargs.get("sort_by") == "date":
             params["sort"] = 1
 
+        # Experience level: 0 (not specified), 1 (<1 year), 2 (1-3 years), 3 (>3 years)
+        if kwargs.get("experience"):
+            params["experience"] = kwargs["experience"]
+
+        # Experience requirement: D (beginner), S (desired), E (required)
+        if kwargs.get("experience_exigence"):
+            params["experienceExigence"] = kwargs["experience_exigence"]
+
+        # Grand domaine (domain code like M18 for IT, D for Sales, etc.)
+        if kwargs.get("grand_domaine"):
+            params["grandDomaine"] = kwargs["grand_domaine"]
+
         if location:
             # If location is a zip code or INSEE code (5 digits), use it directly
             # Otherwise, we assume it's a code passed from SmartJobService
@@ -71,9 +86,8 @@ class FranceTravailService:
                 params["commune"] = location
                 params["distance"] = distance
 
-        print(f"DEBUG: Searching France Travail with params: {params}")
-
         async with httpx.AsyncClient() as client:
+            logger.info(f"DEBUG: France Travail access token: {token}")
             response = await client.get(
                 f"{self.BASE_URL}{self.SEARCH_URL}",
                 headers={"Authorization": f"Bearer {token}"},
