@@ -1,8 +1,11 @@
+import logging
 import time
 
 import httpx
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class FranceTravailService:
@@ -50,11 +53,27 @@ class FranceTravailService:
         if kwargs.get("contract_type"):
             params["typeContrat"] = kwargs["contract_type"]  # e.g. "CDI", "CDD"
 
-        if kwargs.get("is_full_time") is not None:
-            params["tempsPlein"] = "true" if kwargs["is_full_time"] else "false"
+        if kwargs.get("is_full_time"):
+            params["tempsPlein"] = kwargs["is_full_time"]
 
         if kwargs.get("sort_by") == "date":
             params["sort"] = 1
+
+        # Experience level: 0 (not specified), 1 (<1 year), 2 (1-3 years), 3 (>3 years)
+        if kwargs.get("experience"):
+            params["experience"] = kwargs["experience"]
+
+        # Experience requirement: D (beginner), S (desired), E (required)
+        if kwargs.get("experience_exigence"):
+            params["experienceExigence"] = kwargs["experience_exigence"]
+
+        # Grand domaine (domain code like M18 for IT, D for Sales, etc.)
+        if kwargs.get("grand_domaine"):
+            params["grandDomaine"] = kwargs["grand_domaine"]
+
+        # Published since (in days)
+        if kwargs.get("published_since"):
+            params["publieeDepuis"] = kwargs["published_since"]
 
         if location:
             # If location is a zip code or INSEE code (5 digits), use it directly
@@ -71,9 +90,8 @@ class FranceTravailService:
                 params["commune"] = location
                 params["distance"] = distance
 
-        print(f"DEBUG: Searching France Travail with params: {params}")
-
         async with httpx.AsyncClient() as client:
+            logger.info(f"DEBUG: France Travail access token: {token}")
             response = await client.get(
                 f"{self.BASE_URL}{self.SEARCH_URL}",
                 headers={"Authorization": f"Bearer {token}"},
