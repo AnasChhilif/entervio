@@ -248,8 +248,7 @@ class ResumeParserService:
                 for e in user.educations
             ],
             "languages": [
-                {"name": lang.name, "level": lang.proficiency}
-                for lang in user.languages
+                {"name": language.name, "level": language.proficiency} for language in user.languages
             ],
             "skills": {
                 "technical": [
