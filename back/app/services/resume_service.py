@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 from pathlib import Path
@@ -281,12 +282,7 @@ class ResumeParserService:
             tailored_data = json.loads(completion.choices[0].message.content)
             logger.info("✅ Tailored resume data generated successfully with Groq")
         except Exception as e:
-            logger.error(f"Error tailoring resume: {e}")
-            logger.error(
-                f"Raw LLM response: {response.text if 'response' in locals() else 'No response'}"
-            )
-            # Fallback to original if tailoring fails
-            tailored_data = resume_data
+            raise e
 
         # 3. Compile PDF
         logger.info("📝 Compiling PDF with Typst...")
@@ -299,6 +295,7 @@ class ResumeParserService:
             raise e
 
     async def upload_resume(
+        self,
         file: UploadFile,
         db: Session,
         user: User,
