@@ -20,9 +20,10 @@ class User(Base):
     last_name = Column(String, nullable=False)
     email = Column(String, nullable=False)
     phone = Column(String, nullable=True)
+    # website column removed in favor of Resume model
 
-    skills_list = relationship(
-        "Skill", back_populates="user", cascade="all, delete-orphan"
+    resume = relationship(
+        "Resume", uselist=False, back_populates="user", cascade="all, delete-orphan"
     )
     work_experiences = relationship(
         "WorkExperience", back_populates="user", cascade="all, delete-orphan"
@@ -35,6 +36,9 @@ class User(Base):
     )
     languages = relationship(
         "Language", back_populates="user", cascade="all, delete-orphan"
+    )
+    skills_list = relationship(
+        "Skill", back_populates="user", cascade="all, delete-orphan"
     )
 
     # Keeping raw_resume_text for backup/debug

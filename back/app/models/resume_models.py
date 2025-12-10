@@ -4,6 +4,19 @@ from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
+class Resume(Base):
+    __tablename__ = "resumes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+
+    website = Column(String, nullable=True)
+    linkedin = Column(String, nullable=True)
+    summary = Column(Text, nullable=True)
+
+    user = relationship("User", back_populates="resume")
+
+
 class WorkExperience(Base):
     __tablename__ = "work_experiences"
 
@@ -36,6 +49,7 @@ class Education(Base):
     graduation_date = Column(
         String, nullable=True
     )  # Sometimes simpler just to have grad date
+    description = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="educations")
 

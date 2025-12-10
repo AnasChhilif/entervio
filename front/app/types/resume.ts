@@ -15,6 +15,7 @@ export interface Education {
     field_of_study?: string;
     start_date?: string;
     end_date?: string;
+    description?: string;
     is_current_study?: boolean;
 }
 
@@ -41,6 +42,9 @@ export interface Language {
 }
 
 export interface ResumeData {
+    website?: string;
+    linkedin?: string;
+    summary?: string;
     work_experiences: WorkExperience[];
     educations: Education[];
     projects: Project[];

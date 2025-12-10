@@ -18,6 +18,9 @@ import { useAuth } from "~/context/AuthContext";
 import { useNavigate } from "react-router";
 
 const EMPTY_RESUME: ResumeData = {
+    website: "",
+    linkedin: "",
+    summary: "",
     work_experiences: [],
     educations: [],
     projects: [],
@@ -214,22 +217,24 @@ export default function ResumePage() {
     };
 
     // --- Generic Handlers ---
-    const updateItem = <T,>(listKey: keyof ResumeData, index: number, field: keyof T, value: any) => {
+    type ResumeListKey = 'work_experiences' | 'educations' | 'projects' | 'skills' | 'languages';
+
+    const updateItem = <T,>(listKey: ResumeArrayKeys, index: number, field: keyof T, value: any) => {
         setResume(prev => {
-            const list = [...prev[listKey]] as any[];
+            const list = [...(prev[listKey] as any[])];
             list[index] = { ...list[index], [field]: value };
             return { ...prev, [listKey]: list };
         });
     };
 
-    const addItem = (listKey: keyof ResumeData, emptyItem: any) => {
+    const addItem = (listKey: ResumeArrayKeys, emptyItem: any) => {
         setResume(prev => ({
             ...prev,
-            [listKey]: [...prev[listKey], emptyItem]
+            [listKey]: [...(prev[listKey] as any[]), emptyItem]
         }));
     };
 
-    const removeItem = (listKey: keyof ResumeData, index: number) => {
+    const removeItem = (listKey: ResumeArrayKeys, index: number) => {
         setResume(prev => ({
             ...prev,
             [listKey]: (prev[listKey] as any[]).filter((_, i) => i !== index)
@@ -263,6 +268,41 @@ export default function ResumePage() {
                 </div>
 
                 <div className="space-y-8">
+                    {/* Global Info */}
+                    <Card className="border border-border/40 shadow-none bg-card/50">
+                        <CardContent className="p-6 space-y-5">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">Résumé / Profil</Label>
+                                <AutoResizeTextarea
+                                    value={resume.summary || ''}
+                                    onChange={(e) => setResume(prev => ({ ...prev, summary: e.target.value }))}
+                                    placeholder="Un bref résumé de votre profil professionnel..."
+                                    className="text-sm border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500 min-h-[100px]"
+                                />
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-5">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">Site Web</Label>
+                                    <Input
+                                        className="border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
+                                        value={resume.website || ''}
+                                        onChange={(e) => setResume(prev => ({ ...prev, website: e.target.value }))}
+                                        placeholder="https://portfolio.com"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">LinkedIn</Label>
+                                    <Input
+                                        className="border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
+                                        value={resume.linkedin || ''}
+                                        onChange={(e) => setResume(prev => ({ ...prev, linkedin: e.target.value }))}
+                                        placeholder="https://linkedin.com/in/..."
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Work Experience */}
                     <Section 
                         title="Expériences Professionnelles" 
@@ -349,7 +389,7 @@ export default function ResumePage() {
                     <Section 
                         title="Formation" 
                         icon={<GraduationCap className="h-5 w-5" />}
-                        onAdd={() => addItem('educations', { institution: '', degree: '', end_date: '' })}
+                        onAdd={() => addItem('educations', { institution: '', degree: '', end_date: '', description: '' })}
                     >
                         {resume.educations.map((item, idx) => (
                             <Card key={idx} className="group relative border border-border/40 shadow-none bg-card/50 hover:bg-card/80 transition-colors">
@@ -395,6 +435,16 @@ export default function ResumePage() {
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
+                                    </div>
+                                    <Separator className="bg-border/40 mt-4 mb-4" />
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">Description</Label>
+                                        <AutoResizeTextarea
+                                            value={item.description || ''}
+                                            onChange={(e) => updateItem('educations', idx, 'description', e.target.value)}
+                                            placeholder="Détails de la formation, cours pertinents..."
+                                            className="text-sm border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
+                                        />
                                     </div>
                                 </CardContent>
                             </Card>

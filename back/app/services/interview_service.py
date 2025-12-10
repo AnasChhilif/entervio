@@ -64,10 +64,6 @@ class InterviewService:
                     candidate_context = user.raw_resume_text
                 elif user.work_experiences or user.projects:
                     # Fallback: construct simple context string from DB models
-                    # Or use a service method to gather 'resume_data' dict like in tailor_resume
-                    # For now, let's use the helper we used in verify/tailor?
-                    # resume_service_instance.get_core_context expects a dict.
-                    # We can fetch the data into a dict and pass it.
                     pass
 
             if candidate_context == "" and (user.work_experiences or user.projects):

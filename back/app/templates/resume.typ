@@ -66,18 +66,20 @@
 
 // --- Header ---
 #align(center)[
-  #text(font: title_font, weight: "bold", size: 20pt)[#resume_data.contact_info.name] // Serif name
+  #text(font: title_font, weight: "bold", size: 20pt)[#resume_data.contact_info.at("name", default: "")] // Serif name
   \
   #v(3pt)
   #text(size: 8.5pt, fill: gray_color)[
-    #if resume_data.contact_info.phone != none [ #resume_data.contact_info.phone | ]
+    #if resume_data.contact_info.at("phone", default: none) != none [ #resume_data.contact_info.phone | ]
     #if (
-      resume_data.contact_info.email != none
+      resume_data.contact_info.at("email", default: none) != none
     ) [ #link("mailto:" + resume_data.contact_info.email)[#resume_data.contact_info.email] | ]
     #if (
-      resume_data.contact_info.website != none
-    ) [ #link("https://" + resume_data.contact_info.website)[#resume_data.contact_info.website] | ]
-    #if resume_data.contact_info.linkedin != none [ #link(resume_data.contact_info.linkedin)[LinkedIn] ]
+      resume_data.contact_info.at("website", default: none) != none
+    ) [ #link(resume_data.contact_info.website)[#resume_data.contact_info.website] | ]
+    #if resume_data.contact_info.at("linkedin", default: none) != none [ #link(
+      resume_data.contact_info.linkedin,
+    )[LinkedIn] ]
   ]
 ]
 
@@ -91,7 +93,12 @@
 #if "work_experience" in resume_data {
   section_title("Experience")
   for job in resume_data.work_experience {
-    entry_header(job.role, job.company, job.start_date + " - " + job.end_date, "")
+    entry_header(
+      job.at("role", default: ""),
+      job.at("company", default: ""),
+      job.at("start_date", default: "") + " - " + job.at("end_date", default: ""),
+      "",
+    )
     v(2pt)
     if "responsibilities" in job {
       for resp in job.responsibilities {
@@ -106,7 +113,12 @@
 #if "projects" in resume_data {
   section_title("Projects")
   for proj in resume_data.projects {
-    entry_header(proj.name, proj.role, proj.date, proj.tech_stack)
+    entry_header(
+      proj.at("name", default: ""),
+      proj.at("role", default: ""),
+      proj.at("date", default: ""),
+      proj.at("tech_stack", default: ""),
+    )
     v(2pt)
     if "details" in proj {
       for detail in proj.details {
@@ -121,7 +133,18 @@
 #if "education" in resume_data {
   section_title("Education")
   for edu in resume_data.education {
-    entry_header(edu.degree, edu.institution, edu.graduation_date, "")
+    entry_header(
+      edu.at("degree", default: ""),
+      edu.at("institution", default: ""),
+      edu.at("graduation_date", default: ""),
+      "",
+    )
+    v(2pt)
+    if "description" in edu {
+      for desc in edu.description {
+        list(indent: 8pt, body-indent: 4pt, spacing: 0.5em)[#remove_bullets(desc)]
+      }
+    }
     v(4pt)
   }
 }
@@ -145,5 +168,5 @@
 // --- Languages ---
 #if "languages" in resume_data {
   section_title("Languages")
-  resume_data.languages.map(l => [*#l.name*: #l.level]).join(" | ")
+  resume_data.languages.map(l => [*#l.at("name", default: "")*: #l.at("level", default: "")]).join(" | ")
 }

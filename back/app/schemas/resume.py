@@ -31,6 +31,7 @@ class EducationBase(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     graduation_date: str | None = None
+    description: str | None = None
 
 
 class EducationCreate(EducationBase):
@@ -105,6 +106,9 @@ class Skill(SkillBase):
 
 # --- Full Resume ---
 class ResumeFull(BaseModel):
+    website: str | None = None
+    linkedin: str | None = None
+    summary: str | None = None
     work_experiences: list[WorkExperience] = []
     educations: list[Education] = []
     projects: list[Project] = []
@@ -113,6 +117,9 @@ class ResumeFull(BaseModel):
 
 
 class ResumeUpdate(BaseModel):
+    website: str | None = None
+    linkedin: str | None = None
+    summary: str | None = None
     work_experiences: list[WorkExperienceCreate] = []
     educations: list[EducationCreate] = []
     projects: list[ProjectCreate] = []
@@ -123,3 +130,4 @@ class ResumeUpdate(BaseModel):
 class TailorRequest(BaseModel):
     user_id: int
     job_description: str
+    critique: list[str] | None = None

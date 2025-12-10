@@ -178,15 +178,17 @@ export default function Account() {
                                   />
                               </div>
                           </div>
-                          <div className="space-y-2">
-                              <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Téléphone</Label>
-                              <Input
-                                  id="phone"
-                                  value={formData.phone}
-                                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                  className="border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
-                              />
-                          </div>
+                          
+                              <div className="space-y-2">
+                                  <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Téléphone</Label>
+                                  <Input
+                                      id="phone"
+                                      value={formData.phone}
+                                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                      className="border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
+                                  />
+                              </div>
+
                           
                           <div className="flex justify-end gap-3 pt-2">
                               <Button variant="ghost" size="sm" type="button" onClick={() => setEditing(false)}>
