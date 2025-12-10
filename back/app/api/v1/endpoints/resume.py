@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 
 from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser
 from app.core.deps import DbSession
 from app.models.resume_models import (
     Education as EducationModel,
