@@ -11,6 +11,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Layout as AppLayout } from "~/components/layout/Layout";
 import { AuthProvider } from "~/context/AuthContext";
+import { Toaster } from "~/components/ui/sonner";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -48,6 +49,7 @@ export default function App() {
     <AuthProvider>
       <AppLayout>
         <Outlet />
+        <Toaster />
       </AppLayout>
     </AuthProvider>
   );

@@ -9,9 +9,9 @@ import { Separator } from "~/components/ui/separator";
 import { Textarea } from "~/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import { format, parse } from "date-fns";
-import { fr } from "date-fns/locale";
 import { cn } from "~/lib/utils";
 import { Calendar } from "~/components/ui/calendar";
+import { toast } from "sonner";
 
 import type { ResumeData } from "~/types/resume";
 import { useAuth } from "~/context/AuthContext";
@@ -204,6 +204,7 @@ export default function ResumePage() {
             if (res.ok) {
                 const data = await res.json();
                 setResume(data);
+                toast.success("CV mis à jour avec succès");
             }
         } catch (err) {
             console.error(err);

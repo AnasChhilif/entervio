@@ -16,12 +16,10 @@ import {
   FileText,
   Calendar,
   Star,
-  User,
   Search,
   Filter,
   ArrowRight,
   Clock,
-  MoreHorizontal
 } from "lucide-react";
 import { useInterviewListStore } from "~/services/interview-list-store";
 import { cn } from "~/lib/utils";
