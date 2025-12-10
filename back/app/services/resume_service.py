@@ -251,8 +251,8 @@ class ResumeParserService:
         job_description: str,
     ) -> bytes:
         """
-        Generates a custom French cover letter using the Fireside template.
-        All information (company name, recipient, etc.) is extracted from the job description by the LLM.
+        Generates a custom French cover letter using a custom template.
+        Company information is extracted from the job description by the LLM.
 
         Args:
             db: Database session
@@ -319,29 +319,32 @@ class ResumeParserService:
         {job_description}
 
         Instructions:
-        - Analyser la description du poste pour extraire: le nom de l'entreprise, le nom du destinataire (si mentionné), et l'adresse de l'entreprise (si mentionnée)
-        - Rédiger une lettre de motivation professionnelle en français (3-4 paragraphes)
+        - Analyser la description du poste pour extraire le nom de l'entreprise et le destinataire si mentionné
+        - Rédiger une lettre de motivation professionnelle en français (exactement 3 paragraphes distincts)
+        - IMPORTANT: Commencer la lettre avec une formule d'appel appropriée (ex: "Madame, Monsieur," ou le nom du destinataire si connu)
         - Mettre en avant les compétences et expériences pertinentes du candidat
         - Adapter le ton et le vocabulaire à l'offre d'emploi
         - Montrer l'intérêt et la motivation du candidat pour le poste
         - Utiliser des exemples concrets tirés de l'expérience du candidat
         - Rester factuel et ne pas inventer d'informations
-        - NE PAS inclure de formule d'appel (ex: "Madame, Monsieur,") ni de signature (ex: "Cordialement,")
-        - Retourner UNIQUEMENT le corps de la lettre (les paragraphes du milieu)
+        - Terminer par une formule de politesse appropriée (ex: "Cordialement,")
 
-        Structure attendue (3-4 paragraphes):
-        1. Introduction: Poste visé et motivation initiale
-        2. Expériences et compétences pertinentes avec exemples concrets
-        3. Ce que le candidat peut apporter à l'entreprise
-        4. Conclusion et disponibilité
+        Structure OBLIGATOIRE (3 paragraphes):
+        1. Paragraphe 1: Introduction - Poste visé et motivation initiale (2-3 phrases)
+        2. Paragraphe 2: Expériences et compétences pertinentes avec exemples concrets (3-4 phrases)
+        3. Paragraphe 3: Conclusion - Disponibilité pour entretien et formule de politesse (2-3 phrases)
+
+        Format de la lettre:
+        - Commencer par la formule d'appel sur une ligne séparée
+        - Laisser une ligne vide entre la formule d'appel et le premier paragraphe
+        - Laisser une ligne vide entre chaque paragraphe
+        - Terminer par la formule de politesse
 
         Retournez UNIQUEMENT un objet JSON avec cette structure:
         {{
-            "company_name": "Nom de l'entreprise extrait de la description (ou 'Votre entreprise' si non trouvé)",
-            "recipient_name": "Nom du destinataire (ou 'Madame, Monsieur' si non trouvé)",
-            "recipient_title": "Titre du destinataire (ou '' si non trouvé)",
-            "company_address": "Adresse complète de l'entreprise (ou '' si non trouvée)",
-            "body": "Le texte complet de la lettre (sans formule d'appel ni signature)"
+            "greeting": "La formule d'appel (ex: 'Madame, Monsieur,' ou 'Madame Dupont,')",
+            "body": "Les 3 paragraphes de la lettre séparés par des lignes vides (sans la formule d'appel ni la formule de politesse finale)",
+            "closing": "La formule de politesse finale (ex: 'Cordialement,' ou 'Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.')"
         }}
         """
 
@@ -365,63 +368,32 @@ class ResumeParserService:
             logger.error(f"Error generating cover letter: {e}")
             # Fallback to a basic template
             cover_letter_content = {
-                "company_name": "Votre entreprise",
-                "recipient_name": "Madame, Monsieur",
-                "recipient_title": "",
-                "company_address": "",
-                "body": """Je me permets de vous adresser ma candidature pour le poste proposé.
+                "greeting": "Madame, Monsieur,",
+                "body": """Je me permets de vous adresser ma candidature pour le poste proposé au sein de votre entreprise. Votre offre a particulièrement retenu mon attention car elle correspond parfaitement à mon profil et à mes aspirations professionnelles.
 
-Fort de mon expérience et de mes compétences techniques, je suis convaincu de pouvoir contribuer efficacement à vos projets et objectifs.
-
-Mon parcours professionnel m'a permis de développer une expertise solide et une capacité d'adaptation que je souhaite mettre au service de votre entreprise.
+Fort de mon expérience et de mes compétences techniques, je suis convaincu de pouvoir contribuer efficacement à vos projets et objectifs. Mon parcours professionnel m'a permis de développer une expertise solide et une capacité d'adaptation que je souhaite mettre au service de votre entreprise.
 
 Je reste à votre disposition pour un entretien afin de vous présenter plus en détail ma motivation et mes compétences.""",
+                "closing": "Cordialement,",
             }
 
         # Prepare data for Typst template
         current_date = datetime.now().strftime("%d/%m/%Y")
 
-        # Format user address
-        user_address_parts = []
+        # Format user details with name first - using newlines instead of backslash-newline
+        user_details_parts = [user.name]
         if user.phone:
-            user_address_parts.append(user.phone)
+            user_details_parts.append(user.phone)
         if user.email:
-            user_address_parts.append(user.email)
+            user_details_parts.append(user.email)
 
-        user_address = (
-            " \\\n".join(user_address_parts) if user_address_parts else user.email or ""
-        )
-
-        # Format recipient details
-        recipient_parts = []
-        if cover_letter_content.get("recipient_title"):
-            recipient_parts.append(cover_letter_content["recipient_title"])
-        recipient_parts.append(
-            cover_letter_content.get("recipient_name", "Madame, Monsieur")
-        )
-        recipient_parts.append(cover_letter_content.get("company_name", ""))
-        if cover_letter_content.get("company_address"):
-            # Split address by newlines if it contains any
-            recipient_parts.extend(cover_letter_content["company_address"].split("\n"))
-
-        recipient_details = " \\\n".join([p for p in recipient_parts if p])
-
-        # Determine greeting
-        recipient_name = cover_letter_content.get("recipient_name", "Madame, Monsieur")
-        if recipient_name == "Madame, Monsieur" or not recipient_name:
-            greeting = "Madame, Monsieur,"
-        else:
-            greeting = f"{recipient_name},"
+        from_details = "\n".join(user_details_parts)
 
         cover_letter_data = {
-            "title": user.name,
-            "from_details": user_address,
-            "to_details": recipient_details,
-            "date": current_date,
-            "greeting": greeting,
-            "body": cover_letter_content["body"],
-            "closing": "Cordialement,",
-            "signature": user.name,
+            "from_details": from_details,
+            "greeting": cover_letter_content.get("greeting", "Madame, Monsieur,"),
+            "body": cover_letter_content.get("body", ""),
+            "closing": cover_letter_content.get("closing", "Cordialement,"),
         }
 
         # Compile PDF
