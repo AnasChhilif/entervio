@@ -307,46 +307,13 @@ class ResumeParserService:
         }
 
         # Generate cover letter content using LLM
-        prompt = f"""
-        Rôle: Expert en rédaction de lettres de motivation professionnelles en français.
+        prompt = prompt_manager.format_prompt(
+            "cover_letter.generation",
+            job_description=job_description,
+            user_data=json.dumps(user_context, indent=2, ensure_ascii=False),
+        )
 
-        Tâche: Rédiger une lettre de motivation convaincante et personnalisée en français pour cette offre d'emploi.
-
-        Contexte du candidat:
-        {json.dumps(user_context, indent=2, ensure_ascii=False)}
-
-        Description du poste:
-        {job_description}
-
-        Instructions:
-        - Analyser la description du poste pour extraire le nom de l'entreprise et le destinataire si mentionné
-        - Rédiger une lettre de motivation professionnelle en français (exactement 3 paragraphes distincts)
-        - IMPORTANT: Commencer la lettre avec une formule d'appel appropriée (ex: "Madame, Monsieur," ou le nom du destinataire si connu)
-        - Mettre en avant les compétences et expériences pertinentes du candidat
-        - Adapter le ton et le vocabulaire à l'offre d'emploi
-        - Montrer l'intérêt et la motivation du candidat pour le poste
-        - Utiliser des exemples concrets tirés de l'expérience du candidat
-        - Rester factuel et ne pas inventer d'informations
-        - Terminer par une formule de politesse appropriée (ex: "Cordialement,")
-
-        Structure OBLIGATOIRE (3 paragraphes):
-        1. Paragraphe 1: Introduction - Poste visé et motivation initiale (2-3 phrases)
-        2. Paragraphe 2: Expériences et compétences pertinentes avec exemples concrets (3-4 phrases)
-        3. Paragraphe 3: Conclusion - Disponibilité pour entretien et formule de politesse (2-3 phrases)
-
-        Format de la lettre:
-        - Commencer par la formule d'appel sur une ligne séparée
-        - Laisser une ligne vide entre la formule d'appel et le premier paragraphe
-        - Laisser une ligne vide entre chaque paragraphe
-        - Terminer par la formule de politesse
-
-        Retournez UNIQUEMENT un objet JSON avec cette structure:
-        {{
-            "greeting": "La formule d'appel (ex: 'Madame, Monsieur,' ou 'Madame Dupont,')",
-            "body": "Les 3 paragraphes de la lettre séparés par des lignes vides (sans la formule d'appel ni la formule de politesse finale)",
-            "closing": "La formule de politesse finale (ex: 'Cordialement,' ou 'Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.')"
-        }}
-        """
+        system = prompt_manager.format_prompt("cover_letter.system")
 
         try:
             completion = llm_service.groq_client.chat.completions.create(
@@ -354,7 +321,7 @@ class ResumeParserService:
                 messages=[
                     {
                         "role": "system",
-                        "content": "Tu es un expert en rédaction de lettres de motivation professionnelles en français. Tu réponds uniquement en JSON.",
+                        "content": system,
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -377,10 +344,6 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
                 "closing": "Cordialement,",
             }
 
-        # Prepare data for Typst template
-        current_date = datetime.now().strftime("%d/%m/%Y")
-
-        # Format user details with name first - using newlines instead of backslash-newline
         user_details_parts = [user.name]
         if user.phone:
             user_details_parts.append(user.phone)
@@ -397,11 +360,11 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
         }
 
         # Compile PDF
-        logger.info("📝 Compiling cover letter PDF with Typst...")
+        logger.info("Compiling cover letter PDF with Typst...")
         try:
             return self._compile_cover_letter_pdf(cover_letter_data)
         except Exception as e:
-            logger.error(f"❌ Typst Compilation Error: {e}")
+            logger.error(f"Typst Compilation Error: {e}")
             logger.error(
                 f"Data causing error: {json.dumps(cover_letter_data, indent=2)}"
             )
