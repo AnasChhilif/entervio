@@ -9,61 +9,10 @@ import google.generativeai as genai
 import numpy as np
 from groq import Groq
 from pydantic import BaseModel, field_validator
-from pydantic import BaseModel, field_validator
 
 from app.core.config import settings
 from app.core.prompt_manager import prompt_manager
-from app.core.prompt_manager import prompt_manager
 from app.mcp.server import search_jobs
-from app.models.interview import InterviewerStyle
-
-
-class SearchJobsArgs(BaseModel):
-    """Pydantic model for validating LLM search_jobs tool call arguments."""
-
-    query: str
-    location: str | None = None
-    contract_type: Literal["CDI", "CDD", "MIS", "ALE", "DDI", "DIN"] | None = None
-    is_full_time: bool | None = None
-    sort_by: Literal["date", "relevance"] | None = None
-    experience: Literal["0", "1", "2", "3"] | None = None
-    experience_exigence: Literal["D", "S", "E"] | None = None
-    grand_domaine: (
-        Literal[
-            "A",
-            "B",
-            "C",
-            "C15",
-            "D",
-            "E",
-            "F",
-            "G",
-            "H",
-            "I",
-            "J",
-            "K",
-            "L",
-            "L14",
-            "M",
-            "M13",
-            "M14",
-            "M15",
-            "M16",
-            "M17",
-            "M18",
-            "N",
-        ]
-        | None
-    ) = None
-    published_since: int | None = None
-
-    @field_validator("query")
-    @classmethod
-    def query_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("query must not be empty")
-        return v.strip()
-
 from app.models.interview import InterviewerStyle
 
 
@@ -117,8 +66,8 @@ class SearchJobsArgs(BaseModel):
 # Setup logging
 logger = logging.getLogger(__name__)
 
+
 def get_system_prompt(
-    interviewer_type: InterviewerStyle,
     interviewer_type: InterviewerStyle,
     candidate_context: str = "",
     job_description: str = "",
@@ -131,16 +80,7 @@ def get_system_prompt(
     # 2. Personality
     personality_prompt = prompt_manager.get(
         f"interview.personalities.{interviewer_type}"
-
-    # 1. Base instructions
-    base_instructions = prompt_manager.get("interview.base_instructions")
-
-    # 2. Personality
-    personality_prompt = prompt_manager.get(
-        f"interview.personalities.{interviewer_type}"
     )
-
-    prompt = f"{base_instructions}\n\n{personality_prompt}"
 
     prompt = f"{base_instructions}\n\n{personality_prompt}"
 
@@ -148,16 +88,8 @@ def get_system_prompt(
         prompt += "\n\n" + prompt_manager.format_prompt(
             "interview.job_context", job_description=job_description
         )
-        prompt += "\n\n" + prompt_manager.format_prompt(
-            "interview.job_context", job_description=job_description
-        )
 
     if candidate_context:
-        prompt += "\n\n" + prompt_manager.format_prompt(
-            "interview.candidate_context", candidate_context=candidate_context
-        )
-
-    return prompt
         prompt += "\n\n" + prompt_manager.format_prompt(
             "interview.candidate_context", candidate_context=candidate_context
         )
@@ -204,7 +136,6 @@ class LLMService:
         self,
         candidate_name: str,
         interviewer_type: InterviewerStyle,
-        interviewer_type: InterviewerStyle,
         candidate_context: str = "",
         job_description: str = "",
     ) -> str:
@@ -225,14 +156,14 @@ class LLMService:
         )
 
         return prompt_manager.format_prompt(
-            f"interview.greetings.{interviewer_type.value}", candidate_name=candidate_name
+            f"interview.greetings.{interviewer_type.value}",
+            candidate_name=candidate_name,
         )
 
     async def chat(
         self,
         message: str,
         conversation_history: list[dict[str, str]],
-        interviewer_type: InterviewerStyle,
         interviewer_type: InterviewerStyle,
         candidate_context: str = "",
         job_description: str = "",
@@ -290,7 +221,6 @@ class LLMService:
 
     async def grade_response(
         self, question: str, answer: str, interviewer_type: InterviewerStyle
-        self, question: str, answer: str, interviewer_type: InterviewerStyle
     ) -> dict[str, any]:
         """
         Grade a candidate's response to an interview question.
@@ -310,20 +240,12 @@ class LLMService:
             grading_system = system_prompt + prompt_manager.get(
                 "interview.grading_system_suffix"
             )
-            grading_prompt = prompt_manager.format_prompt(
-                "interview.grading", question=question, answer=answer
-            )
-
-            grading_system = system_prompt + prompt_manager.get(
-                "interview.grading_system_suffix"
-            )
 
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {
                         "role": "system",
-                        "content": grading_system,
                         "content": grading_system,
                     },
                     {"role": "user", "content": grading_prompt},
@@ -342,7 +264,6 @@ class LLMService:
     async def end_interview(
         self,
         conversation_history: list[dict[str, str]],
-        interviewer_type: InterviewerStyle,
         interviewer_type: InterviewerStyle,
     ) -> dict[str, Any]:
         """
@@ -365,9 +286,6 @@ class LLMService:
                     role = "assistant"
                 messages.append({"role": role, "content": msg["content"]})
 
-            prompt = prompt_manager.format_prompt(
-                "interview.feedback", interviewer_type=interviewer_type
-            )
             prompt = prompt_manager.format_prompt(
                 "interview.feedback", interviewer_type=interviewer_type
             )
@@ -609,48 +527,6 @@ class LLMService:
                                     "type": "integer",
                                     "description": "Filter jobs published within the last X days. Use this when the user asks for 'recent' jobs or jobs from the last few days.",
                                 },
-                                "experience": {
-                                    "type": "string",
-                                    "enum": ["0", "1", "2", "3"],
-                                    "description": "Experience level: '0' (not specified), '1' (<1 year/junior), '2' (1-3 years/mid), '3' (>3 years/senior). Infer from user context or explicit request.",
-                                },
-                                "experience_exigence": {
-                                    "type": "string",
-                                    "enum": ["D", "S", "E"],
-                                    "description": "Experience requirement: 'D' (beginner/débutant accepted), 'S' (experience desired/souhaitée), 'E' (experience required/exigée). Use 'D' for juniors, 'E' for seniors.",
-                                },
-                                "grand_domaine": {
-                                    "type": "string",
-                                    "enum": [
-                                        "A",
-                                        "B",
-                                        "C",
-                                        "C15",
-                                        "D",
-                                        "E",
-                                        "F",
-                                        "G",
-                                        "H",
-                                        "I",
-                                        "J",
-                                        "K",
-                                        "L",
-                                        "L14",
-                                        "M",
-                                        "M13",
-                                        "M14",
-                                        "M15",
-                                        "M16",
-                                        "M17",
-                                        "M18",
-                                        "N",
-                                    ],
-                                    "description": "Domain code to filter by sector. Key codes: M18=IT/Tech, D=Sales, H=Industry, J=Health, K=Services, F=Construction, N=Transport, M14=Consulting. Use to narrow results.",
-                                },
-                                "published_since": {
-                                    "type": "integer",
-                                    "description": "Filter jobs published within the last X days. Use this when the user asks for 'recent' jobs or jobs from the last few days.",
-                                },
                             },
                             "required": ["query"],
                         },
@@ -662,20 +538,13 @@ class LLMService:
                 "search.tool_orchestration", user_context=user_context
             )
 
-            system_content = prompt_manager.format_prompt(
-                "search.tool_orchestration", user_context=user_context
-            )
-
             messages = [
                 {
                     "role": "system",
                     "content": system_content,
-                    "content": system_content,
                 },
                 {"role": "user", "content": user_query},
             ]
-
-            logger.info(f"🤖 Groq decided to call {messages}")
 
             logger.info(f"🤖 Groq decided to call {messages}")
 
@@ -685,7 +554,6 @@ class LLMService:
                 tools=tools_schema,
                 tool_choice="auto",
                 max_tokens=4096,
-                temperature=0,
                 temperature=0,
             )
 
@@ -738,15 +606,6 @@ class LLMService:
                         # Call the imported function with validated args
                         # search_jobs returns a JSON string
                         jobs_json = await search_jobs.fn(
-                            query=validated_args.query,
-                            location=validated_args.location,
-                            contract_type=validated_args.contract_type,
-                            is_full_time=validated_args.is_full_time,
-                            sort_by=validated_args.sort_by,
-                            experience=validated_args.experience,
-                            experience_exigence=validated_args.experience_exigence,
-                            grand_domaine=validated_args.grand_domaine,
-                            published_since=validated_args.published_since,
                             query=validated_args.query,
                             location=validated_args.location,
                             contract_type=validated_args.contract_type,
