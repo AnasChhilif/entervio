@@ -15,7 +15,9 @@ class User(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
     deleted_at = Column(DateTime, nullable=True)
-    name = Column(String, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
     email = Column(String, nullable=False)
     phone = Column(String, nullable=True)
 
@@ -40,3 +42,13 @@ class User(Base):
     supabase_id = Column(Text, nullable=True)
 
     interviews = relationship("Interview", back_populates="user")
+
+    @property
+    def has_resume(self) -> bool:
+        return bool(
+            self.work_experiences
+            or self.educations
+            or self.projects
+            or self.skills_list
+            or self.languages
+        )

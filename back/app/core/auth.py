@@ -94,7 +94,8 @@ def get_current_db_user(
         new_user = User(
             supabase_id=supabase_id,
             email=email,
-            name=user_metadata.get("name", email.split("@")[0]),  # Fallback name
+            first_name=user_metadata.get("first_name", email.split("@")[0]),
+            last_name=user_metadata.get("last_name", ""),
             phone=user_metadata.get("phone"),
         )
         db.add(new_user)

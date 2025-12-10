@@ -276,7 +276,6 @@ class ResumeParserService:
                 )
 
             # Populate Education
-            # Populate Education
             for edu in parsed_data.get("education", []):
                 db.add(
                     Education(
@@ -290,7 +289,6 @@ class ResumeParserService:
                     )
                 )
 
-            # Populate Projects
             # Populate Projects
             for proj in parsed_data.get("projects", []):
                 db.add(
@@ -323,14 +321,8 @@ class ResumeParserService:
                 db.add(Skill(user_id=user.id, name=s, category="soft"))
 
             user.raw_resume_text = raw_text
-            # Update user contact info if extracted
-            contact = parsed_data.get("contact_info", {})
-            if contact.get("phone"):
-                user.phone = contact.get("phone")
-            if contact.get("email"):
-                user.email = contact.get("email")
-            if contact.get("name"):
-                user.name = contact.get("name")
+
+
 
             db.add(user)
             db.commit()
@@ -339,7 +331,6 @@ class ResumeParserService:
             return {
                 "message": "Resume uploaded and parsed successfully",
                 "candidate_id": user.id,
-                "name": user.name,
                 "skills_count": len(user.skills_list),
             }
         except Exception as e:

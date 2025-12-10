@@ -1,7 +1,7 @@
 # app/api/v1/router.py
 from fastapi import APIRouter, Depends
 
-from app.api.v1.endpoints import auth, candidates, interviews, jobs, resume, voice_chat
+from app.api.v1.endpoints import auth, interviews, jobs, resume, voice_chat
 from app.core.auth import get_current_user
 
 api_router = APIRouter()
@@ -18,12 +18,6 @@ protected_router.include_router(
     voice_chat.router,
     prefix="/voice",
     tags=["voice-chat"],
-)
-
-protected_router.include_router(
-    candidates.router,
-    prefix="/candidates",
-    tags=["candidates"],
 )
 
 api_router.include_router(

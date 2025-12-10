@@ -104,7 +104,8 @@ export class ApiError extends Error {
 }
 
 export interface SignupRequest {
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   password: string;
   phone?: string;
@@ -113,7 +114,8 @@ export interface SignupRequest {
 export interface SignupResponse {
   id: number;
   email: string;
-  name: string;
+  first_name: string;
+  last_name: string;
 }
 
 export const interviewApi = {
@@ -281,7 +283,7 @@ export const interviewApi = {
     formData.append("file", file);
 
     const response = await fetch(
-      `${API_BASE_URL}/candidates/upload_resume`,
+      `${API_BASE_URL}/resume/upload_resume`,
       withAuthHeaders({
         method: "POST",
         body: formData,
@@ -474,7 +476,7 @@ export const authApi = {
     return response.json();
   },
 
-  async getMe(): Promise<{ id: number; email: string; name: string; has_resume: boolean }> {
+  async getMe(): Promise<{ id: number; email: string; first_name: string; last_name: string; has_resume: boolean }> {
     const response = await fetch(`${API_BASE_URL}/auth/me`, withAuthHeaders());
 
     if (!response.ok) {

@@ -1,25 +1,106 @@
-"""Resume REST API Endpoints"""
+import logging
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from app.core.auth import CurrentUser
 from app.core.deps import DbSession
-from app.schemas.resume import TailorRequest
+from app.models.resume_models import (
+    Education as EducationModel,
+)
+from app.models.resume_models import (
+    Language as LanguageModel,
+)
+from app.models.resume_models import (
+    Project as ProjectModel,
+)
+from app.models.resume_models import (
+    Skill as SkillModel,
+)
+from app.models.resume_models import (
+    WorkExperience as WorkExperienceModel,
+)
+from app.schemas.resume import ResumeFull, ResumeUpdate
 from app.services.resume_service import resume_service_instance
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.post("/tailor")
-async def tailor_resume(request: TailorRequest, db: DbSession):
-    """Tailor a resume based on a job description."""
+@router.post("/upload_resume")
+async def upload_resume(
+    file: Annotated[UploadFile, File()],
+    db: DbSession,
+    user: CurrentUser,
+):
+    """
+    Upload a resume (PDF), parse it, and create a candidate profile.
+    """
     try:
-        pdf_bytes = await resume_service_instance.tailor_resume(
-            db, request.user_id, request.job_description
-        )
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": "attachment; filename=tailored_resume.pdf"},
-        )
+        return await resume_service_instance.upload_resume(file, db, user)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"Error uploading resume: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error: {str(e)}"
+        ) from e
+
+
+@router.get("/full", response_model=ResumeFull)
+async def get_full_resume(user: CurrentUser):
+    """Get full structured resume."""
+    return ResumeFull(
+        work_experiences=user.work_experiences,
+        educations=user.educations,
+        projects=user.projects,
+        languages=user.languages,
+        skills=user.skills_list,
+    )
+
+
+@router.put("/full", response_model=ResumeFull)
+async def update_full_resume(payload: ResumeUpdate, user: CurrentUser, db: DbSession):
+    """
+    Update full structured resume.
+    Warning: This replaces all existing entries for the user with the new list.
+    """
+    # 1. Clear existing generic relationships
+    # Note: We use the relationship attributes to access and clear them,
+    # but we need to be careful with session management.
+    # A safer way handling "replace all" is deleting by user_id.
+
+    # Delete existing records
+    db.query(WorkExperienceModel).filter(
+        WorkExperienceModel.user_id == user.id
+    ).delete()
+    db.query(EducationModel).filter(EducationModel.user_id == user.id).delete()
+    db.query(ProjectModel).filter(ProjectModel.user_id == user.id).delete()
+    db.query(LanguageModel).filter(LanguageModel.user_id == user.id).delete()
+    db.query(SkillModel).filter(SkillModel.user_id == user.id).delete()
+
+    # 2. Add new records
+    for item in payload.work_experiences:
+        db.add(WorkExperienceModel(**item.model_dump(), user_id=user.id))
+
+    for item in payload.educations:
+        db.add(EducationModel(**item.model_dump(), user_id=user.id))
+
+    for item in payload.projects:
+        db.add(ProjectModel(**item.model_dump(), user_id=user.id))
+
+    for item in payload.languages:
+        db.add(LanguageModel(**item.model_dump(), user_id=user.id))
+
+    for item in payload.skills:
+        db.add(SkillModel(**item.model_dump(), user_id=user.id))
+
+    db.commit()
+    db.refresh(user)
+
+    return ResumeFull(
+        work_experiences=user.work_experiences,
+        educations=user.educations,
+        projects=user.projects,
+        languages=user.languages,
+        skills=user.skills_list,
+    )

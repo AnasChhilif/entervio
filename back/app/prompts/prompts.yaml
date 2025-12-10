@@ -139,7 +139,7 @@ interview:
 
   feedback: |
     ANALYSIS REQUEST:
-    The interview is finished. Based on the conversation history above, provide a structured evaluation.
+    The interview is finished. Based on the conversation history above, provide a structured evaluation in french.
 
     Personality: {interviewer_type}
 

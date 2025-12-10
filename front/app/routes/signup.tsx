@@ -17,7 +17,8 @@ export function meta({ }: Route.MetaArgs) {
 export default function Signup() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
@@ -43,7 +44,7 @@ export default function Signup() {
     setSubmitting(true);
 
     try {
-      await authApi.signup({ name, email, password, phone: phone || undefined });
+      await authApi.signup({ first_name: firstName, last_name: lastName, email, password, phone: phone || undefined });
       await login({ email, password });
       navigate("/resume", {
         replace: true,
@@ -66,19 +67,35 @@ export default function Signup() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="name">
-                Nom complet
-              </label>
-              <Input
-                id="name"
-                placeholder="Jean Dupont"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-                className="bg-background/50 border-input hover:border-primary/50 transition-colors"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="firstName">
+                  Prénom
+                </label>
+                <Input
+                  id="firstName"
+                  placeholder="Jean"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoComplete="given-name"
+                  className="bg-background/50 border-input hover:border-primary/50 transition-colors"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="lastName">
+                  Nom
+                </label>
+                <Input
+                  id="lastName"
+                  placeholder="Dupont"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  autoComplete="family-name"
+                  className="bg-background/50 border-input hover:border-primary/50 transition-colors"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">

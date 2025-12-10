@@ -8,6 +8,7 @@ export default [
     index("routes/_index.tsx"),
     route("setup", "routes/setup.tsx"),
     route("account", "routes/account.tsx"),
+    route("account/resume", "routes/account.resume.tsx"),
     route("interviews", "routes/interviews.tsx", [
       index("routes/interviews._index.tsx"),
       route(":interviewId", "routes/InterviewFeedback.tsx"),
