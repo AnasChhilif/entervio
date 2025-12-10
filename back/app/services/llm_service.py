@@ -155,7 +155,7 @@ class LLMService:
         )
 
         return prompt_manager.format_prompt(
-            f"interview.greetings.{interviewer_type}", candidate_name=candidate_name
+            f"interview.greetings.{interviewer_type.value}", candidate_name=candidate_name
         )
 
     async def chat(
