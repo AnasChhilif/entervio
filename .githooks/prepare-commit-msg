@@ -1,8 +1,6 @@
 #!/bin/bash
-
 COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
-
 # Add issue number for regular commits and commits with -m flag
 # Skip for merge, squash, amend, etc.
 if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
@@ -15,9 +13,9 @@ if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
         COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
         
         # Check if issue number is already in the message
-        if ! echo "$COMMIT_MSG" | grep -qE "^#$ISSUE_NUMBER"; then
-            # Prepend issue number to commit message
-            echo "#$ISSUE_NUMBER $COMMIT_MSG" > "$COMMIT_MSG_FILE"
+        if ! echo "$COMMIT_MSG" | grep -qE "#$ISSUE_NUMBER"; then
+            # Append issue number to commit message
+            echo "$COMMIT_MSG #$ISSUE_NUMBER" > "$COMMIT_MSG_FILE"
         fi
     fi
 fi
