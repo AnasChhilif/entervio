@@ -313,12 +313,20 @@ class LLMService:
             }
 
     async def compute_similarity_ranking(
-        self, candidate_profile: str, jobs: list[dict[str, Any]]
+        self,
+        candidate_profile: str,
+        jobs: list[dict[str, Any]],
+        query: str | None = None,
     ) -> list[dict[str, Any]]:
         """
         Rerank jobs using Google Embeddings (text-embedding-004) with Batching + Async safety.
+        Implements Weighted Hybrid Search:
+        - If query is provided: Score = 0.7 * Query_Sim + 0.3 * Profile_Sim
+        - If query is missing: Score = Profile_Sim
         """
         logger.info(f"⚖️ Reranking {len(jobs)} jobs using Google Embeddings...")
+        if query:
+            logger.info(f"🎯 using Weighted Hybrid Reranking (Query: '{query}')")
 
         # 1. Fast fail checks
         if not jobs or not self.has_gemini:
@@ -356,7 +364,6 @@ class LLMService:
                 valid_jobs = valid_jobs[:100]
 
             # 3. Define the synchronous embedding worker
-            # We wrap this entire block to run it in a thread
             def _get_embeddings_sync():
                 # A. Embed Profile (Query)
                 profile_resp = genai.embed_content(
@@ -366,7 +373,17 @@ class LLMService:
                 )
                 p_vec = np.array(profile_resp["embedding"])
 
-                # B. Embed Jobs (Batch)
+                # B. Embed Query (if present)
+                q_vec = None
+                if query:
+                    query_resp = genai.embed_content(
+                        model="models/text-embedding-004",
+                        content=query,
+                        task_type="retrieval_query",
+                    )
+                    q_vec = np.array(query_resp["embedding"])
+
+                # C. Embed Jobs (Batch)
                 jobs_resp = genai.embed_content(
                     model="models/text-embedding-004",
                     content=job_texts,
@@ -375,10 +392,12 @@ class LLMService:
 
                 # The response structure for batch input usually contains a list of embeddings
                 j_vecs = np.array(jobs_resp["embedding"])
-                return p_vec, j_vecs
+                return p_vec, q_vec, j_vecs
 
             # 4. Run blocking network calls in a thread pool
-            profile_vector, job_vectors = await asyncio.to_thread(_get_embeddings_sync)
+            profile_vector, query_vector, job_vectors = await asyncio.to_thread(
+                _get_embeddings_sync
+            )
 
             # Ensure job_vectors is at least 2D
             if job_vectors.ndim == 1:
@@ -386,44 +405,68 @@ class LLMService:
 
             # 5. Compute Similarity (Vectorized Math is faster)
             # Normalize vectors
-            norm_profile = np.linalg.norm(profile_vector)
             norm_jobs = np.linalg.norm(job_vectors, axis=1)
+            norm_profile = np.linalg.norm(profile_vector)
 
             # Avoid division by zero
-            # Create a mask for valid norms
-            valid_norms = (norm_profile > 0) & (norm_jobs > 0)
+            valid_norms_p = (norm_profile > 0) & (norm_jobs > 0)
 
-            # Dot product of Profile (1, D) and Jobs (N, D) -> (N,)
-            # We can use pure numpy broadcasting here for speed
-            scores = np.zeros(len(valid_jobs))
-
+            # --- Score Profile ---
+            scores_p = np.zeros(len(valid_jobs))
             if norm_profile > 0:
-                dot_products = np.dot(job_vectors, profile_vector)
-                # Cosine Sim = Dot / (NormA * NormB)
-                # Handle safe division
-                similarities = np.divide(
-                    dot_products,
+                dot_products_p = np.dot(job_vectors, profile_vector)
+                similarities_p = np.divide(
+                    dot_products_p,
                     norm_profile * norm_jobs,
-                    out=np.zeros_like(dot_products),
-                    where=valid_norms,
+                    out=np.zeros_like(dot_products_p),
+                    where=valid_norms_p,
                 )
-                scores = similarities * 100
+                scores_p = similarities_p * 100
+
+            # --- Score Query (if exists) ---
+            if query_vector is not None:
+                norm_query = np.linalg.norm(query_vector)
+                valid_norms_q = (norm_query > 0) & (norm_jobs > 0)
+                scores_q = np.zeros(len(valid_jobs))
+
+                if norm_query > 0:
+                    dot_products_q = np.dot(job_vectors, query_vector)
+                    similarities_q = np.divide(
+                        dot_products_q,
+                        norm_query * norm_jobs,
+                        out=np.zeros_like(dot_products_q),
+                        where=valid_norms_q,
+                    )
+                    scores_q = similarities_q * 100
+
+                # WEIGHTED HYBRID SCORE: 70% Query + 30% Profile
+                final_scores = (0.7 * scores_q) + (0.3 * scores_p)
+                logger.info("⚖️ Applied weights: 0.7 * Query + 0.3 * Profile")
+            else:
+                # Fallback to pure profile match
+                final_scores = scores_p
+                logger.info("⚖️ Using 100% Profile match (no query provided)")
 
             # 6. Assign Scores & Reasoning
             reranked_jobs = []
             for i, job in enumerate(valid_jobs):
-                final_score = int(scores[i])
+                final_score = int(final_scores[i])
                 job["relevance_score"] = final_score
 
                 # Dynamic reasoning based on score bucket
                 if final_score >= 85:
-                    reasoning = "Excellent match stratégique (IA)"
+                    reasoning = "Excellent match (Top 1%)"
                 elif final_score >= 70:
-                    reasoning = "Forte correspondance avec votre profil (IA)"
+                    reasoning = "Très pertinent"
                 elif final_score >= 50:
-                    reasoning = "Correspondance potentielle (IA)"
+                    reasoning = "Correspondance moyenne"
                 else:
                     reasoning = "Pertinence limitée"
+
+                if query and final_score >= 60:
+                    reasoning += " • Aligné avec votre recherche"
+                elif final_score >= 60:
+                    reasoning += " • Aligné avec votre profil"
 
                 job["relevance_reasoning"] = reasoning
                 reranked_jobs.append(job)
@@ -432,7 +475,7 @@ class LLMService:
             reranked_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)
 
             logger.info(
-                f"✅ Jobs reranked via Google Embeddings (Top: {reranked_jobs[0]['relevance_score'] if reranked_jobs else 0})"
+                f"✅ Jobs reranked via Hybrid Embeddings (Top: {reranked_jobs[0]['relevance_score'] if reranked_jobs else 0})"
             )
             return reranked_jobs
 

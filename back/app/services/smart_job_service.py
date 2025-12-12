@@ -67,7 +67,7 @@ class SmartJobService:
 
         # 5. Rerank
         reranked_jobs = await llm_service.compute_similarity_ranking(
-            profile_summary, found_jobs
+            profile_summary, found_jobs, query=query
         )
 
         return reranked_jobs
