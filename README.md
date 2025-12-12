@@ -55,7 +55,7 @@ The platform leverages a high-performance mix of state-of-the-art AI models:
 
 ### 1. Backend Setup
 
-The backend uses `uv` for lightning-fast dependency management.
+The backend uses `uv` for lightning-fast dependency management.ééé
 
 ```bash
 git clone https://github.com/AnasChhilif/entervio.git

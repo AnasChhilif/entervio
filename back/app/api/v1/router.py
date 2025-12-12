@@ -20,7 +20,7 @@ protected_router.include_router(
     tags=["voice-chat"],
 )
 
-api_router.include_router(
+protected_router.include_router(
     jobs.router,
     prefix="/jobs",
     tags=["jobs"],
