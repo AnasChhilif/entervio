@@ -1,5 +1,6 @@
 """Interview Service - Business logic for managing interviews"""
 
+import json
 import logging
 
 from sqlalchemy.orm import Session
@@ -44,7 +45,7 @@ class InterviewService:
             Dict with interview_id, greeting text, and interview details
         """
         try:
-            logger.info(f"Starting interview: {user.name} | {interviewer_style}")
+            logger.info(f"Starting interview: {user.first_name} | {interviewer_style}")
 
             # Create interview in database
             db_interview = Interview(
@@ -63,10 +64,6 @@ class InterviewService:
                     candidate_context = user.raw_resume_text
                 elif user.work_experiences or user.projects:
                     # Fallback: construct simple context string from DB models
-                    # Or use a service method to gather 'resume_data' dict like in tailor_resume
-                    # For now, let's use the helper we used in verify/tailor?
-                    # resume_service_instance.get_core_context expects a dict.
-                    # We can fetch the data into a dict and pass it.
                     pass
 
             if candidate_context == "" and (user.work_experiences or user.projects):
@@ -78,7 +75,7 @@ class InterviewService:
 
             # Get personalized greeting from LLM
             greeting_text = self.llm_service.get_initial_greeting(
-                candidate_name=user.name,
+                candidate_name=user.first_name,
                 interviewer_type=interviewer_style,
                 candidate_context=candidate_context,
                 job_description=job_description,
@@ -94,7 +91,7 @@ class InterviewService:
             db.commit()
             db.refresh(db_interview)
 
-            logger.info(f"Generated {interviewer_style} greeting for {user.name}")
+            logger.info(f"Generated {interviewer_style} greeting for {user.first_name}")
 
             return {
                 "session_id": str(
@@ -102,7 +99,7 @@ class InterviewService:
                 ),  # Return as string for compatibility
                 "interview_id": db_interview.id,
                 "text": greeting_text,
-                "candidate_name": user.name,
+                "candidate_name": user.first_name,
                 "interviewer_style": interviewer_style,
                 "message": "Interview session started",
             }
@@ -166,12 +163,12 @@ class InterviewService:
                 db.refresh(interview.user)
                 if interview.user.raw_resume_text:
                     logger.info(
-                        f"Found candidate {interview.user.name} with resume text length: {len(interview.user.raw_resume_text)}"
+                        f"Found candidate {interview.user.first_name} with resume text length: {len(interview.user.raw_resume_text)}"
                     )
                     candidate_context = interview.user.raw_resume_text
                 else:
                     logger.warning(
-                        f"Candidate {interview.user.name} has no resume text."
+                        f"Candidate {interview.user.first_name} has no resume text."
                     )
             else:
                 logger.warning("No candidate associated with this interview.")
@@ -249,16 +246,13 @@ class InterviewService:
                 interview.question_answers[-1] if interview.question_answers else None
             )
             if last_qa and last_qa.answer is None:
-                last_qa.answer = "[No response provided]"
+                last_qa.answer = "[Pas de réponse]"
 
             conversation_history = self._build_conversation_history(interview)
 
             summary = await self.llm_service.end_interview(
                 conversation_history, interview.interviewer_style
             )
-
-            # Serialize dictionary to JSON string for storage
-            import json
 
             interview.global_feedback = json.dumps(summary)
 
@@ -283,14 +277,30 @@ class InterviewService:
 
         interviews = query.all()
 
-        # Convert to dictionaries with calculated average grade
+        # Convert to dictionaries with calculated average grade or global score
         result = []
         for interview in interviews:
-            # Calculate average grade from question_answers
-            grades = [
-                qa.grade for qa in interview.question_answers if qa.grade is not None
-            ]
-            avg_grade = sum(grades) / len(grades) if grades else 0
+            final_grade = 0
+
+            # Try to get global score first
+            if interview.global_feedback:
+                try:
+                    summary_data = json.loads(interview.global_feedback)
+                    # Use .get() to avoid errors if score is missing
+                    if "score" in summary_data:
+                        final_grade = float(summary_data["score"])
+                except Exception:
+                    # If JSON parse fails or other error, fall back to average
+                    pass
+
+            # Fallback to average calculation if no valid global score found (and it is 0)
+            if final_grade == 0:
+                grades = [
+                    qa.grade
+                    for qa in interview.question_answers
+                    if qa.grade is not None
+                ]
+                final_grade = sum(grades) / len(grades) if grades else 0
 
             result.append(
                 {
@@ -298,7 +308,7 @@ class InterviewService:
                     "created_at": interview.created_at,
                     "interviewer_style": interview.interviewer_style,
                     "question_count": len(interview.question_answers),
-                    "grade": avg_grade,
+                    "grade": final_grade,
                 }
             )
 
@@ -327,7 +337,7 @@ class InterviewService:
         return {
             "session_id": str(interview_id),
             "interview_id": interview_id,
-            "candidate_name": interview.user.name,
+            "candidate_name": interview.user.first_name,
             "interviewer_style": interview.interviewer_style,
             "question_count": question_count,
         }
@@ -358,7 +368,7 @@ class InterviewService:
         return {
             "session_id": str(interview_id),
             "interview_id": interview_id,
-            "candidate_name": interview.user.name,
+            "candidate_name": interview.user.first_name,
             "interviewer_style": interview.interviewer_style,
             "question_count": question_count,
             "history": conversation_history,

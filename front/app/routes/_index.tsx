@@ -39,7 +39,7 @@ const INTERVIEWER_STYLE_LABELS: Record<string, string> = {
 };
 
 export default function Home() {
-  const [user, setUser] = useState<{ name: string } | null>(null);
+  const [user, setUser] = useState<{ first_name: string } | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -103,7 +103,7 @@ export default function Home() {
               {user ? (
                 <>
                   Bonjour <br />
-                  {user.name}
+                  {user.first_name}
                 </>
               ) : (
                 <>

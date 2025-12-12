@@ -11,7 +11,14 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.prompt_manager import prompt_manager
-from app.models.resume_models import Education, Language, Project, Skill, WorkExperience
+from app.models.resume_models import (
+    Education,
+    Language,
+    Project,
+    Resume,
+    Skill,
+    WorkExperience,
+)
 from app.models.user import User
 from app.services.llm_service import llm_service
 
@@ -142,7 +149,11 @@ class ResumeParserService:
         )
 
     async def tailor_resume(
-        self, db: Session, user_id: int, job_description: str
+        self,
+        db: Session,
+        user_id: int,
+        job_description: str,
+        critique: list[str] | None = None,
     ) -> bytes:
         """
         Tailors the user's resume for the given job description and returns PDF bytes.
@@ -154,13 +165,17 @@ class ResumeParserService:
         # 1. Convert Relational Data to Dictionary
         resume_data = {
             "contact_info": {
-                "name": user.name,
+                "name": f"{user.first_name} {user.last_name}",
+                "first_name": user.first_name,
+                "last_name": user.last_name,
                 "email": user.email,
                 "phone": user.phone,
-                "linkedin": None,
-                "website": None,
+                "linkedin": user.resume.linkedin if user.resume else None,
+                "website": user.resume.website if user.resume else None,
             },
-            "summary": "Experienced professional.",
+            "summary": user.resume.summary
+            if user.resume and user.resume.summary
+            else "Experienced professional.",
             "work_experience": [
                 {
                     "company": w.company,
@@ -189,6 +204,7 @@ class ResumeParserService:
                     "institution": e.institution,
                     "degree": e.degree,
                     "graduation_date": e.graduation_date or e.end_date,
+                    "description": e.description.split("\n") if e.description else [],
                 }
                 for e in user.educations
             ],
@@ -208,9 +224,16 @@ class ResumeParserService:
         if not llm_service.groq_client:
             raise ValueError("Groq client not initialized")
 
+        effective_job_description = job_description
+        if critique:
+            effective_job_description += (
+                "\n\nCRITIQUE / FEEDBACK TO ADDRESS:\n"
+                + "\n".join(f"- {c}" for c in critique)
+            )
+
         prompt = prompt_manager.format_prompt(
             "resume.tailoring",
-            job_description=job_description,
+            job_description=effective_job_description,
             resume_json=json.dumps(resume_data),
         )
 
@@ -230,6 +253,18 @@ class ResumeParserService:
             )
             tailored_data = json.loads(completion.choices[0].message.content)
             logger.info("✅ Tailored resume data generated successfully with Groq")
+
+            # Basic structure check only - allow fields to be missing/null as Typst template now handles defaults
+            if "skills" not in tailored_data:
+                tailored_data["skills"] = {"technical": [], "soft": []}
+            else:
+                # Ensure sub-dictionaries exist to prevent 'NoneType' errors if 'skills' key exists but value is null/incomplete
+                if not tailored_data["skills"]:
+                    tailored_data["skills"] = {"technical": [], "soft": []}
+                else:
+                    tailored_data["skills"].setdefault("technical", [])
+                    tailored_data["skills"].setdefault("soft", [])
+
         except Exception as e:
             raise e
 
@@ -270,7 +305,7 @@ class ResumeParserService:
 
         # Prepare user context for LLM
         user_context = {
-            "name": user.name,
+            "name": user.first_name,
             "email": user.email,
             "phone": user.phone,
             "work_experience": [
@@ -309,7 +344,7 @@ class ResumeParserService:
         prompt = prompt_manager.format_prompt(
             "cover_letter.generation",
             job_description=job_description,
-            user_data=json.dumps(user_context, indent=2, ensure_ascii=False),
+            user_context=json.dumps(user_context, indent=2, ensure_ascii=False),
         )
 
         system = prompt_manager.format_prompt("cover_letter.system")
@@ -343,7 +378,7 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
                 "closing": "Cordialement,",
             }
 
-        user_details_parts = [user.name]
+        user_details_parts = [f"{user.first_name} {user.last_name}"]
         if user.phone:
             user_details_parts.append(user.phone)
         if user.email:
@@ -399,6 +434,20 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
             if "error" in parsed_data:
                 raise HTTPException(status_code=500, detail=parsed_data["error"])
 
+            # Sync Resume global fields
+            resume_entry = db.query(Resume).filter(Resume.user_id == user.id).first()
+            if not resume_entry:
+                resume_entry = Resume(user_id=user.id)
+                db.add(resume_entry)
+
+            resume_entry.summary = parsed_data.get("summary")
+            contact = parsed_data.get("contact_info", {})
+            # Try to extract website/linkedin if parser found them (often parser puts them in contact_info)
+            if "website" in contact:
+                resume_entry.website = contact["website"]
+            if "linkedin" in contact:
+                resume_entry.linkedin = contact["linkedin"]
+
             # Populate Work Experience
             for exp in parsed_data.get("work_experience", []):
                 db.add(
@@ -424,6 +473,7 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
                         start_date=edu.get("start_date"),
                         end_date=edu.get("end_date"),
                         graduation_date=edu.get("graduation_date"),
+                        description=edu.get("description", ""),
                     )
                 )
 
@@ -459,14 +509,6 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
                 db.add(Skill(user_id=user.id, name=s, category="soft"))
 
             user.raw_resume_text = raw_text
-            # Update user contact info if extracted
-            contact = parsed_data.get("contact_info", {})
-            if contact.get("phone"):
-                user.phone = contact.get("phone")
-            if contact.get("email"):
-                user.email = contact.get("email")
-            if contact.get("name"):
-                user.name = contact.get("name")
 
             db.add(user)
             db.commit()
@@ -475,7 +517,6 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
             return {
                 "message": "Resume uploaded and parsed successfully",
                 "candidate_id": user.id,
-                "name": user.name,
                 "skills_count": len(user.skills_list),
             }
         except Exception as e:

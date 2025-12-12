@@ -4,6 +4,7 @@ import { supabase } from "~/lib/supabaseClient";
 
 interface AuthContextValue {
   user: any | null;
+  token: string | null;
   isLoading: boolean;
   login: (opts: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -15,6 +16,7 @@ const ACCESS_TOKEN_KEY = "supabase.access_token";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -24,12 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       if (session?.access_token) {
+        setToken(session.access_token);
         try {
           if (typeof window !== "undefined") {
             window.localStorage.setItem(ACCESS_TOKEN_KEY, session.access_token);
           }
         } catch {
         }
+      } else {
+        setToken(null);
       }
       setIsLoading(false);
     };
@@ -40,6 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      if (session?.access_token) {
+        setToken(session.access_token);
+      } else {
+        setToken(null);
+      }
       try {
         if (typeof window !== "undefined") {
           if (session?.access_token) {
@@ -88,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
