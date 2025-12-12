@@ -1,12 +1,9 @@
 """LLM Service using Groq for Interview Scenarios"""
 
-import asyncio
 import json
 import logging
 from typing import Any, Literal
 
-import google.generativeai as genai
-import numpy as np
 from groq import Groq
 from pydantic import BaseModel, field_validator
 
@@ -115,22 +112,6 @@ class LLMService:
                 logger.error(f"❌ Failed to initialize Groq client: {str(e)}")
         else:
             logger.warning("⚠️ GROQ_API_KEY not configured. LLM features will not work.")
-
-        # Initialize Google GenAI (for Embeddings)
-        gemini_api_key = settings.GEMINI_API_KEY
-        if gemini_api_key:
-            try:
-                genai.configure(api_key=gemini_api_key)
-                logger.info(
-                    "✅ Google GenAI initialized successfully (for Embeddings)."
-                )
-                self.has_gemini = True
-            except Exception as e:
-                logger.error(f"❌ Failed to initialize Google GenAI: {e}")
-                self.has_gemini = False
-        else:
-            logger.warning("⚠️ GEMINI_API_KEY not configured. Embeddings will not work.")
-            self.has_gemini = False
 
     def get_initial_greeting(
         self,
@@ -311,135 +292,6 @@ class LLMService:
                 "tips": [],
                 "overall_comment": "Erreur technique.",
             }
-
-    async def compute_similarity_ranking(
-        self, candidate_profile: str, jobs: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """
-        Rerank jobs using Google Embeddings (text-embedding-004) with Batching + Async safety.
-        """
-        logger.info(f"⚖️ Reranking {len(jobs)} jobs using Google Embeddings...")
-
-        # 1. Fast fail checks
-        if not jobs or not self.has_gemini:
-            return jobs
-
-        # 2. Prepare Data (Sync part is fast enough to run in main thread)
-        try:
-            # Truncate profile to fit model limits (approx 2048 tokens ~ 8000 chars)
-            profile_text = candidate_profile[:8000]
-
-            job_texts = []
-            valid_jobs = []
-
-            # Pre-filter jobs to avoid empty text errors
-            for job in jobs:
-                title = job.get("intitule", "")
-                desc = job.get("description", "")[:2000]
-                # Skip jobs with literally no info
-                if not title and len(desc) < 10:
-                    continue
-
-                text = f"Title: {title}\nDescription: {desc}"
-                job_texts.append(text)
-                valid_jobs.append(job)
-
-            if not job_texts:
-                return jobs
-
-            # Cap at 100 to respect batch limits for now (simple safety)
-            if len(job_texts) > 100:
-                logger.warning(
-                    f"⚠️ Capping reranking at 100 jobs (received {len(job_texts)})"
-                )
-                job_texts = job_texts[:100]
-                valid_jobs = valid_jobs[:100]
-
-            # 3. Define the synchronous embedding worker
-            # We wrap this entire block to run it in a thread
-            def _get_embeddings_sync():
-                # A. Embed Profile (Query)
-                profile_resp = genai.embed_content(
-                    model="models/text-embedding-004",
-                    content=profile_text,
-                    task_type="retrieval_query",
-                )
-                p_vec = np.array(profile_resp["embedding"])
-
-                # B. Embed Jobs (Batch)
-                jobs_resp = genai.embed_content(
-                    model="models/text-embedding-004",
-                    content=job_texts,
-                    task_type="retrieval_document",
-                )
-
-                # The response structure for batch input usually contains a list of embeddings
-                j_vecs = np.array(jobs_resp["embedding"])
-                return p_vec, j_vecs
-
-            # 4. Run blocking network calls in a thread pool
-            profile_vector, job_vectors = await asyncio.to_thread(_get_embeddings_sync)
-
-            # Ensure job_vectors is at least 2D
-            if job_vectors.ndim == 1:
-                job_vectors = job_vectors.reshape(1, -1)
-
-            # 5. Compute Similarity (Vectorized Math is faster)
-            # Normalize vectors
-            norm_profile = np.linalg.norm(profile_vector)
-            norm_jobs = np.linalg.norm(job_vectors, axis=1)
-
-            # Avoid division by zero
-            # Create a mask for valid norms
-            valid_norms = (norm_profile > 0) & (norm_jobs > 0)
-
-            # Dot product of Profile (1, D) and Jobs (N, D) -> (N,)
-            # We can use pure numpy broadcasting here for speed
-            scores = np.zeros(len(valid_jobs))
-
-            if norm_profile > 0:
-                dot_products = np.dot(job_vectors, profile_vector)
-                # Cosine Sim = Dot / (NormA * NormB)
-                # Handle safe division
-                similarities = np.divide(
-                    dot_products,
-                    norm_profile * norm_jobs,
-                    out=np.zeros_like(dot_products),
-                    where=valid_norms,
-                )
-                scores = similarities * 100
-
-            # 6. Assign Scores & Reasoning
-            reranked_jobs = []
-            for i, job in enumerate(valid_jobs):
-                final_score = int(scores[i])
-                job["relevance_score"] = final_score
-
-                # Dynamic reasoning based on score bucket
-                if final_score >= 85:
-                    reasoning = "Excellent match stratégique (IA)"
-                elif final_score >= 70:
-                    reasoning = "Forte correspondance avec votre profil (IA)"
-                elif final_score >= 50:
-                    reasoning = "Correspondance potentielle (IA)"
-                else:
-                    reasoning = "Pertinence limitée"
-
-                job["relevance_reasoning"] = reasoning
-                reranked_jobs.append(job)
-
-            # 7. Sort
-            reranked_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)
-
-            logger.info(
-                f"✅ Jobs reranked via Google Embeddings (Top: {reranked_jobs[0]['relevance_score'] if reranked_jobs else 0})"
-            )
-            return reranked_jobs
-
-        except Exception as e:
-            logger.error(f"❌ Error in RAG Reranking: {str(e)}")
-            # Fallback: Return original list order if AI fails
-            return jobs
 
     async def search_with_tools(
         self, user_query: str, user_context: str, tools: list[Any]
