@@ -3,6 +3,7 @@
 import json
 import logging
 
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.interview import Interview, InterviewerStyle
@@ -110,7 +111,12 @@ class InterviewService:
             raise
 
     async def process_response(
-        self, db: Session, interview_id: int, audio_file_path: str, language: str = "fr"
+        self,
+        db: Session,
+        interview_id: int,
+        audio_file_path: str,
+        user_id: int,
+        language: str = "fr",
     ) -> dict:
         """
         Process candidate's audio response.
@@ -129,6 +135,12 @@ class InterviewService:
             interview = db.query(Interview).filter(Interview.id == interview_id).first()
             if not interview:
                 raise ValueError(f"Interview {interview_id} not found")
+
+            if interview.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to access this interview",
+                )
 
             logger.info(f"🎤 Processing audio for interview {interview_id}")
 
@@ -223,7 +235,7 @@ class InterviewService:
             logger.error(f"Error processing response: {str(e)}")
             raise
 
-    async def end_interview(self, db: Session, interview_id: int) -> dict:
+    async def end_interview(self, db: Session, interview_id: int, user_id: int) -> dict:
         """
         End interview session and generate summary.
 
@@ -239,6 +251,12 @@ class InterviewService:
             interview = db.query(Interview).filter(Interview.id == interview_id).first()
             if not interview:
                 raise ValueError(f"Interview {interview_id} not found")
+
+            if interview.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to end this interview",
+                )
 
             logger.info(f"👋 Ending interview {interview_id}")
 
@@ -374,7 +392,7 @@ class InterviewService:
             "history": conversation_history,
         }
 
-    def delete_session(self, db: Session, interview_id: int) -> bool:
+    def delete_session(self, db: Session, interview_id: int, user_id: int) -> bool:
         """
         Delete a session.
 
@@ -388,6 +406,12 @@ class InterviewService:
         interview = db.query(Interview).filter(Interview.id == interview_id).first()
         if not interview:
             return False
+
+        if interview.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete this interview",
+            )
 
         db.delete(interview)
         db.commit()
