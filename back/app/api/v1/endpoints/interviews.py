@@ -58,6 +58,7 @@ async def start_interview(
 async def process_audio_response(
     interview_id: int,
     audio: Annotated[UploadFile, File()],
+    user: CurrentUser,
     db: DbSession,
     language: Annotated[str, Form()] = "fr",
 ):
@@ -77,6 +78,7 @@ async def process_audio_response(
                 db=db,
                 interview_id=interview_id,
                 audio_file_path=temp_audio_path,
+                user_id=user.id,
                 language=language,
             )
             return result
@@ -97,10 +99,12 @@ async def process_audio_response(
 
 
 @router.post("/{interview_id}/end")
-async def end_interview(interview_id: int, db: DbSession):
+async def end_interview(interview_id: int, user: CurrentUser, db: DbSession):
     """End interview session and get summary."""
     try:
-        await interview_service.end_interview(db=db, interview_id=interview_id)
+        await interview_service.end_interview(
+            db=db, interview_id=interview_id, user_id=user.id
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
@@ -147,10 +151,10 @@ async def get_interview_summary(interview_id: int, db: DbSession):
 
 
 @router.delete("/{interview_id}")
-async def delete_session(interview_id: int, db: DbSession):
+async def delete_session(interview_id: int, user: CurrentUser, db: DbSession):
     """Delete a session without ending interview."""
     try:
-        deleted = interview_service.delete_session(db, interview_id)
+        deleted = interview_service.delete_session(db, interview_id, user.id)
         if not deleted:
             raise HTTPException(status_code=404, detail="Interview not found")
 
