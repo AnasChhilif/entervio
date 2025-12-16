@@ -126,11 +126,16 @@ export default function Account() {
                   </div>
               </div>
 
-              <div className="mt-2 md:mt-0">
+              <div className="mt-2 md:mt-0 flex items-center gap-2">
                  {user?.has_resume ? (
-                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-0 px-4 py-1.5 text-sm font-medium rounded-full shadow-none transition-colors">
-                      CV Importé
-                    </Badge>
+                    <>
+                      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-0 px-4 py-1.5 text-sm font-medium rounded-full shadow-none transition-colors">
+                        CV Importé
+                      </Badge>
+                      <Button asChild variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">
+                        <Link to="/account/resume">Modifier</Link>
+                      </Button>
+                    </>
                   ) : (
                      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 px-4 py-1.5 text-sm font-medium rounded-full shadow-none">
                       CV Incomplet

@@ -163,14 +163,21 @@ export default function Setup() {
               </Label>
 
               {candidateId ? (
-                <div className="flex items-center gap-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 text-emerald-900">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                    <CheckCircle className="w-6 h-6" />
+                <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 text-emerald-900">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                      <CheckCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="font-medium">CV Analysé avec succès</p>
+                      <p className="text-sm text-emerald-700/80">Votre profil sera utilisé pour personnaliser les questions.</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">CV Analysé avec succès</p>
-                    <p className="text-sm text-emerald-700/80">Votre profil sera utilisé pour personnaliser les questions.</p>
-                  </div>
+                  <Button asChild variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100">
+                    <a href="/account/resume" target="_blank" rel="noopener noreferrer">
+                       Modifier
+                    </a>
+                  </Button>
                 </div>
               ) : (
                 <div className="relative">
