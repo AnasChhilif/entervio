@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, Plus, Trash2, Save, Loader2, Briefcase, GraduationCap, Code, Languages, Lightbulb, Calendar as CalendarIcon } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Loader2, Briefcase, GraduationCap, Code, Languages, Lightbulb, Calendar as CalendarIcon, Upload } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -217,7 +217,7 @@ export default function ResumePage() {
     };
 
     // --- Generic Handlers ---
-    type ResumeListKey = 'work_experiences' | 'educations' | 'projects' | 'skills' | 'languages';
+    type ResumeArrayKeys = 'work_experiences' | 'educations' | 'projects' | 'skills' | 'languages';
 
     const updateItem = <T,>(listKey: ResumeArrayKeys, index: number, field: keyof T, value: any) => {
         setResume(prev => {
@@ -261,10 +261,48 @@ export default function ResumePage() {
                             <p className="text-muted-foreground text-sm">Mettez à jour vos expériences et compétences</p>
                         </div>
                     </div>
-                    <Button onClick={handleSave} disabled={saving} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-none rounded-lg">
-                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Enregistrer
-                    </Button>
+                    
+                    <div className="flex items-center gap-3">
+                         <div className="hidden">
+                            <Input
+                                id="reupload-resume"
+                                type="file"
+                                accept=".pdf"
+                                onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        const file = e.target.files[0];
+                                        const toastId = toast.loading("Analyse du CV en cours...");
+                                        try {
+                                             // Dynamic import to avoid circular deps if any, or just consistent usage
+                                            const { interviewApi } = await import("~/lib/api");
+                                            await interviewApi.uploadResume(file);
+                                            toast.success("CV mis à jour avec succès", { id: toastId });
+                                            // Refresh data
+                                            fetchResume();
+                                        } catch (error) {
+                                            console.error(error);
+                                            toast.error("Erreur lors de l'upload", { id: toastId });
+                                        }
+                                    }
+                                }}
+                            />
+                        </div>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="bg-white"
+                            onClick={() => document.getElementById('reupload-resume')?.click()}
+                            disabled={saving}
+                        >
+                            <Upload className="mr-2 h-4 w-4" />
+                            Réimporter PDF
+                        </Button>
+
+                        <Button onClick={handleSave} disabled={saving} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-none rounded-lg">
+                            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Enregistrer
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="space-y-8">

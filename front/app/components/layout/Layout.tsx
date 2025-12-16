@@ -8,11 +8,12 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isSearchPage = location.pathname.startsWith("/jobs");
+  const isOnboardingPage = location.pathname === "/resume";
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
-      <Navbar />
-      <main className="bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
+      {!isOnboardingPage && <Navbar />}
+      <main className={isOnboardingPage ? "" : "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background"}>
         {children}
       </main>
 
