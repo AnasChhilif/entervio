@@ -101,11 +101,12 @@ export default function Setup() {
             </Label>
             <div className="grid gap-6 md:grid-cols-3">
               {INTERVIEWER_CONFIGS.map((config) => (
-                <div
+                <button
+                  type="button"
                   key={config.type}
                   onClick={() => setSelectedInterviewer(config.type)}
                   className={cn(
-                    "group relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-300 hover:shadow-md",
+                    "group relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-300 hover:shadow-md text-left",
                     selectedInterviewer === config.type
                       ? "border-primary bg-secondary/10 shadow-[var(--shadow-diffuse)]"
                       : "border-border bg-card hover:border-primary/30"
@@ -131,7 +132,7 @@ export default function Setup() {
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {config.description}
                   </p>
-                </div>
+                </button>
               ))}
             </div>
           </div>
