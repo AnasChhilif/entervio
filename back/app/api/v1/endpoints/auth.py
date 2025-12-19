@@ -23,8 +23,6 @@ class SignupRequest(BaseModel):
 class SignupResponse(BaseModel):
     id: int
     email: EmailStr
-    id: int
-    email: EmailStr
     first_name: str
     last_name: str
 
@@ -41,7 +39,7 @@ async def signup(payload: SignupRequest, db: DbSession):
             detail="Supabase configuration is not set",
         )
 
-    supabase_auth_url = f"{settings.SUPABASE_URL}/auth/v1/signup"
+    supabase_auth_url = f"{settings.SUPABASE_URL}/auth/v1/admin/users"
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
@@ -55,10 +53,10 @@ async def signup(payload: SignupRequest, db: DbSession):
                 json={
                     "email": payload.email,
                     "password": payload.password,
+                    "email_confirm": True,
                     "user_metadata": {
                         "first_name": payload.first_name,
                         "last_name": payload.last_name,
-                        "email_verified": True,
                         "phone": payload.phone,
                     },
                 },
