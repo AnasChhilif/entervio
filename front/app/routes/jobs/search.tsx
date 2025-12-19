@@ -519,11 +519,11 @@ function JobDetail({
   return (
     <div
       className={cn(
-        "bg-white border-gray-100 shadow-sm overflow-y-auto custom-scrollbar",
-        // Mobile: Take full height, relative positioning
-        "min-h-screen w-full relative",
-        // Desktop: Fixed height, sticky positioning, rounded corners
-        "lg:h-[calc(100vh-140px)] lg:sticky lg:top-4 lg:rounded-2xl lg:border",
+        "bg-white border-gray-100 shadow-sm",
+        // DESKTOP: Keep the "Dashboard" feel
+        "lg:h-[calc(100vh-140px)] lg:sticky lg:top-4 lg:overflow-y-auto lg:rounded-2xl lg:border",
+        // MOBILE: Let it be a normal, fluid element
+        "h-auto w-full relative",
       )}
     >
       {" "}
@@ -667,8 +667,37 @@ export default function JobsSearch() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
+  const [showHeader, setShowHeader] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
   const selectedJob = jobs.find((j) => j.id === selectedJobId) || null;
   const showDetail = selectedJobId !== null;
+
+  // 1. Handle Header Hiding on Scroll
+  useEffect(() => {
+    const controlNavbar = () => {
+      if (typeof window !== "undefined") {
+        const currentScrollY = window.scrollY;
+        // Show if at top OR scrolling up
+        if (currentScrollY < 100) {
+          setShowHeader(true);
+        } else {
+          setShowHeader(currentScrollY < lastScrollY);
+        }
+        setLastScrollY(currentScrollY);
+      }
+    };
+    window.addEventListener("scroll", controlNavbar);
+    return () => window.removeEventListener("scroll", controlNavbar);
+  }, [lastScrollY]);
+
+  // 2. Scroll to top when clicking a job on mobile
+  const handleJobClick = (id: string) => {
+    setSelectedJobId(id);
+    if (window.innerWidth < 1024) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const handleSmartSearch = async () => {
     // Allow empty query (uses profile)
@@ -706,9 +735,11 @@ export default function JobsSearch() {
     <div className="min-h-screen bg-[#FAFAFA] text-gray-900 font-sans flex flex-col">
       {/* Header & Search */}
       <div
-        className={cn("bg-white border-b border-gray-200 sticky top-0 z-30", {
-          "hidden lg:block": showDetail,
-        })}
+        className={cn(
+          "bg-white border-b border-gray-200 sticky top-0 z-30 transition-transform duration-300 ease-in-out",
+          !showHeader && "-translate-y-full", // Hides header when scrolling down
+          { "hidden lg:block": showDetail },
+        )}
       >
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -793,7 +824,7 @@ export default function JobsSearch() {
                   key={job.id}
                   job={job}
                   isSelected={selectedJobId === job.id}
-                  onClick={() => setSelectedJobId(job.id)}
+                  onClick={() => handleJobClick(job.id)}
                 />
               ))}
             </div>
