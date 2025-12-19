@@ -517,7 +517,16 @@ function JobDetail({
     job.origineOffre?.urlOrigine;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-y-auto sticky top-4 custom-scrollbar">
+    <div
+      className={cn(
+        "bg-white border-gray-100 shadow-sm overflow-y-auto custom-scrollbar",
+        // Mobile: Take full height, relative positioning
+        "min-h-screen w-full relative",
+        // Desktop: Fixed height, sticky positioning, rounded corners
+        "lg:h-[calc(100vh-140px)] lg:sticky lg:top-4 lg:rounded-2xl lg:border",
+      )}
+    >
+      {" "}
       <Button
         onClick={onBack}
         variant="ghost"
@@ -525,7 +534,6 @@ function JobDetail({
       >
         <ArrowLeft className="w-5 h-5" />
       </Button>
-
       {/* Header Image/Pattern */}
       <div className="h-32 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-100 relative overflow-hidden">
         <div
@@ -536,7 +544,6 @@ function JobDetail({
           }}
         ></div>
       </div>
-
       <div className="px-8 pb-12 -mt-12 relative">
         {/* Company Logo (Placeholder) */}
         <div className="w-24 h-24 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center mb-6">
