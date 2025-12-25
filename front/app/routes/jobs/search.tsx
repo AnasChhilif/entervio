@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import {
   Building2,
@@ -11,8 +12,10 @@ import {
   Download,
   Mail,
   ArrowLeft,
+  Mic,
 } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
+import { useSetupStore } from "~/services/usesetupstore";
 import { cn } from "~/lib/utils";
 
 function formatSalary(salary: string): string {
@@ -493,6 +496,8 @@ function JobDetail({
   job: JobOffer | null;
   onBack: () => void;
 }) {
+  const navigate = useNavigate();
+
   if (!job) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-12 text-muted-foreground bg-white rounded-2xl border border-dashed border-gray-200">
@@ -575,6 +580,18 @@ function JobDetail({
                 jobDescription={job.description}
                 jobTitle={job.intitule}
               />
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-full h-12 px-6 border-indigo-200 bg-indigo-50/50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 hover:text-indigo-800 transition-all md:col-span-2 shadow-sm"
+                onClick={() => {
+                  useSetupStore.getState().setJobDescription(job.description);
+                  navigate("/setup");
+                }}
+              >
+                <Mic className="w-4 h-4 mr-2" />
+                Simuler un entretien
+              </Button>
             </div>
 
             {applyUrl && (
