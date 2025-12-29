@@ -46,12 +46,6 @@ export const jobsService = {
     return response.data;
   },
 
-  searchLocations: async (query: string): Promise<City[]> => {
-    const params = new URLSearchParams({ query });
-    const response = await api.get(`/jobs/locations?${params.toString()}`);
-    return response.data;
-  },
-
   trackApplication: async (
     jobId: string,
     jobTitle: string,
