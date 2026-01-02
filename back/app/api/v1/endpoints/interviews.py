@@ -151,6 +151,49 @@ async def get_interview_summary(interview_id: int, db: DbSession):
     return interview_service.get_interview_summary(db, interview_id)
 
 
+@router.post("/{interview_id}/questions/{question_id}/example")
+async def generate_example_response(
+    interview_id: int,
+    question_id: int,
+    user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Generate an example response for a specific question in an interview.
+
+    Args:
+        interview_id: Interview identifier
+        question_id: Question-answer identifier
+        user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Updated question-answer object with the generated example response
+    """
+    try:
+        logger.info(
+            f"💡 Generating example response for question {question_id} in interview {interview_id}"
+        )
+
+        result = await interview_service.generate_example_response(
+            db=db,
+            interview_id=interview_id,
+            question_id=question_id,
+            user_id=user.id,
+        )
+
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating example response: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.delete("/{interview_id}")
 async def delete_session(interview_id: int, user: CurrentUser, db: DbSession):
     """Delete a session without ending interview."""
