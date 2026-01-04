@@ -10,7 +10,6 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.scheduler import shutdown_scheduler, start_scheduler
-from app.services.grading_service import grading_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,7 +27,6 @@ async def lifespan(app: FastAPI):
     yield
 
     shutdown_scheduler()
-    grading_service.shutdown(wait=True)
 
 
 sentry_sdk.init(
@@ -50,7 +48,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,6 +60,7 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Voice Interview API", "status": "running"}
+
 
 @app.get("/health")
 def health_check():

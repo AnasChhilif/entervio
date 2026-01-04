@@ -1,7 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi.types import UnionType
-from pydantic.v1.fields import Undefined
 from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,13 +10,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
-    )
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
     deleted_at = Column(DateTime, nullable=True)
@@ -52,6 +48,9 @@ class User(Base):
     supabase_id = Column(Text, nullable=True, unique=True)
 
     interviews = relationship("Interview", back_populates="user")
+    applications = relationship(
+        "Application", back_populates="user", cascade="all, delete-orphan"
+    )
 
     @property
     def has_resume(self) -> bool:

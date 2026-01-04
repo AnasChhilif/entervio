@@ -3,7 +3,7 @@ import os
 import tempfile
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from app.core.auth import CurrentUser
 from app.core.deps import DbSession
@@ -23,9 +23,8 @@ async def get_interviews(
     Get list of interviews, optionally filtered by candidate_id.
 
     Args:
-        candidate_id: Optional candidate ID to filter interviews
+        user: Current authenticated user
         db: Database session
-        interview_service: Interview service instance
 
     Returns:
         List of interviews with id, candidate_id, interviewer_style, question_count, and average grade
@@ -60,11 +59,12 @@ async def process_audio_response(
     audio: Annotated[UploadFile, File()],
     user: CurrentUser,
     db: DbSession,
+    background_tasks: BackgroundTasks,
     language: Annotated[str, Form()] = "fr",
 ):
     """Process audio response from candidate."""
     try:
-        logger.info(f"🎤 Processing audio for interview {interview_id}")
+        logger.info(f"Processing audio for interview {interview_id}")
 
         # Save uploaded audio to temporary file
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
@@ -79,6 +79,7 @@ async def process_audio_response(
                 interview_id=interview_id,
                 audio_file_path=temp_audio_path,
                 user_id=user.id,
+                background_tasks=background_tasks,
                 language=language,
             )
             return result
@@ -93,7 +94,7 @@ async def process_audio_response(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"❌ Error processing audio: {str(e)}")
+        logger.error(f"Error processing audio: {str(e)}")
         logger.exception("Full traceback:")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -108,7 +109,7 @@ async def end_interview(interview_id: int, user: CurrentUser, db: DbSession):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"❌ Error ending interview: {str(e)}")
+        logger.error(f"Error ending interview: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -124,7 +125,7 @@ async def get_conversation_history(interview_id: int, db: DbSession):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting history: {str(e)}")
+        logger.error(f"Error getting history: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -140,7 +141,7 @@ async def get_session_info(interview_id: int, db: DbSession):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting session info: {str(e)}")
+        logger.error(f"Error getting session info: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -148,6 +149,49 @@ async def get_session_info(interview_id: int, db: DbSession):
 async def get_interview_summary(interview_id: int, db: DbSession):
     """Get interview summary."""
     return interview_service.get_interview_summary(db, interview_id)
+
+
+@router.post("/{interview_id}/questions/{question_id}/example")
+async def generate_example_response(
+    interview_id: int,
+    question_id: int,
+    user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Generate an example response for a specific question in an interview.
+
+    Args:
+        interview_id: Interview identifier
+        question_id: Question-answer identifier
+        user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Updated question-answer object with the generated example response
+    """
+    try:
+        logger.info(
+            f"💡 Generating example response for question {question_id} in interview {interview_id}"
+        )
+
+        result = await interview_service.generate_example_response(
+            db=db,
+            interview_id=interview_id,
+            question_id=question_id,
+            user_id=user.id,
+        )
+
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating example response: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.delete("/{interview_id}")
@@ -163,5 +207,5 @@ async def delete_session(interview_id: int, user: CurrentUser, db: DbSession):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error deleting session: {str(e)}")
+        logger.error(f"Error deleting session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e

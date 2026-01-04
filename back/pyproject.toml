@@ -37,6 +37,8 @@ dependencies = [
     "apscheduler>=3.11.1",
     "sentry-sdk[fastapi]>=2.48.0",
     "supabase>=2.27.0",
+    "psycopg2-binary>=2.9.11",
+    "dspy-ai>=3.0.4",
 ]
 
 [dependency-groups]

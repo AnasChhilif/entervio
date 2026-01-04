@@ -20,11 +20,12 @@ import {
   Filter,
   ArrowRight,
   Clock,
+  Briefcase,
 } from "lucide-react";
-import { useInterviewListStore } from "~/services/interview-list-store";
+import { useInterviewListStore } from "~/services/interviewListStore";
 import { cn } from "~/lib/utils";
 
-export function meta({ }: Route.MetaArgs) {
+export function meta({}: Route.MetaArgs) {
   return [
     { title: "Mes entretiens - Entervio" },
     { name: "description", content: "Historique de vos entretiens" },
@@ -44,7 +45,8 @@ const INTERVIEWER_STYLE_COLORS: Record<string, string> = {
 };
 
 export default function InterviewsIndex() {
-  const { interviews, loading, error, fetchInterviews } = useInterviewListStore();
+  const { interviews, loading, error, fetchInterviews } =
+    useInterviewListStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("date-desc");
   const [filterType, setFilterType] = useState("all");
@@ -72,16 +74,27 @@ export default function InterviewsIndex() {
   const filteredInterviews = interviews
     .filter((interview) => {
       const matchesSearch =
-        interview.interviewer_style.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (INTERVIEWER_STYLE_LABELS[interview.interviewer_style] || "").toLowerCase().includes(searchTerm.toLowerCase());
+        interview.interviewer_style
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        (INTERVIEWER_STYLE_LABELS[interview.interviewer_style] || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
 
-      const matchesType = filterType === "all" || interview.interviewer_style === filterType;
+      const matchesType =
+        filterType === "all" || interview.interviewer_style === filterType;
 
       return matchesSearch && matchesType;
     })
     .sort((a, b) => {
-      if (sortBy === "date-desc") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      if (sortBy === "date-asc") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sortBy === "date-desc")
+        return (
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      if (sortBy === "date-asc")
+        return (
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
       if (sortBy === "grade-desc") return b.grade - a.grade;
       if (sortBy === "grade-asc") return a.grade - b.grade;
       return 0;
@@ -103,7 +116,13 @@ export default function InterviewsIndex() {
       <div className="container mx-auto px-6 py-24 text-center">
         <div className="p-6 bg-red-50 text-red-900 rounded-lg inline-block">
           <p>Une erreur est survenue: {error}</p>
-          <Button onClick={() => fetchInterviews()} variant="outline" className="mt-4">Réessayer</Button>
+          <Button
+            onClick={() => fetchInterviews()}
+            variant="outline"
+            className="mt-4"
+          >
+            Réessayer
+          </Button>
         </div>
       </div>
     );
@@ -176,8 +195,12 @@ export default function InterviewsIndex() {
           <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
             <FileText className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-xl font-medium text-foreground mb-2">Aucune session trouvée</h3>
-          <p className="text-muted-foreground">Essayez de modifier vos filtres ou démarrez une nouvelle simulation.</p>
+          <h3 className="text-xl font-medium text-foreground mb-2">
+            Aucune session trouvée
+          </h3>
+          <p className="text-muted-foreground">
+            Essayez de modifier vos filtres ou démarrez une nouvelle simulation.
+          </p>
         </div>
       )}
 
@@ -195,22 +218,43 @@ export default function InterviewsIndex() {
                 <div className="flex justify-between items-start mb-4">
                   <Badge
                     variant="outline"
-                    className={cn("px-3 py-1 font-medium border", INTERVIEWER_STYLE_COLORS[interview.interviewer_style] || "bg-gray-100 text-gray-700")}
+                    className={cn(
+                      "px-3 py-1 font-medium border",
+                      INTERVIEWER_STYLE_COLORS[interview.interviewer_style] ||
+                        "bg-gray-100 text-gray-700",
+                    )}
                   >
-                    {INTERVIEWER_STYLE_LABELS[interview.interviewer_style] || interview.interviewer_style}
+                    {INTERVIEWER_STYLE_LABELS[interview.interviewer_style] ||
+                      interview.interviewer_style}
                   </Badge>
-                  <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-sm font-bold", getGradeColor(interview.grade))}>
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-sm font-bold",
+                      getGradeColor(interview.grade),
+                    )}
+                  >
                     <Star className="w-3.5 h-3.5 fill-current" />
                     {interview.grade.toFixed(1)}
                   </div>
                 </div>
                 <CardTitle className="text-xl font-serif font-medium text-foreground group-hover:text-primary transition-colors">
-                  Entretien {INTERVIEWER_STYLE_LABELS[interview.interviewer_style]}
+                  Entretien{" "}
+                  {INTERVIEWER_STYLE_LABELS[interview.interviewer_style]}
                 </CardTitle>
               </CardHeader>
 
               <CardContent>
                 <div className="space-y-4">
+                  {/* Job Description Preview (if available) */}
+                  {interview.job_description && (
+                    <div className="flex items-start gap-2 p-2 bg-muted/30 rounded-lg">
+                      <Briefcase className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {interview.job_description}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4" />
                     {formatDate(interview.created_at)}
