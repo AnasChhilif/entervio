@@ -1,5 +1,3 @@
-"use client"
-
 import type React from "react"
 
 import { Button } from "~/components/ui/button"
@@ -19,11 +17,20 @@ import {
   MessageSquare,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
+import { supabase } from "~/lib/supabase"
 
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0)
   const [mounted, setMounted] = useState(false)
   const observerRef = useRef<IntersectionObserver | null>(null)
+
+  // Waitlist state
+  const [email, setEmail] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<{
+    type: "success" | "error" | null
+    message: string
+  }>({ type: null, message: "" })
 
   useEffect(() => {
     setMounted(true)
@@ -70,6 +77,46 @@ export default function LandingPage() {
     }
   }
 
+  const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setSubmitStatus({ type: null, message: "" })
+
+    try {
+      const { error } = await supabase
+        .from("waitlist")
+        .insert({ email: email.trim().toLowerCase() })
+
+      if (error) {
+        // Check for duplicate email
+        if (error.code === "23505") {
+          setSubmitStatus({
+            type: "error",
+            message: "Cet email est déjà inscrit sur la liste d'attente.",
+          })
+        } else {
+          setSubmitStatus({
+            type: "error",
+            message: "Une erreur s'est produite. Veuillez réessayer.",
+          })
+        }
+      } else {
+        setSubmitStatus({
+          type: "success",
+          message: "Merci ! Vous êtes inscrit sur la liste d'attente.",
+        })
+        setEmail("") // Clear input on success
+      }
+    } catch (error) {
+      setSubmitStatus({
+        type: "error",
+        message: "Une erreur s'est produite. Veuillez réessayer.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-secondary/30">
       <nav
@@ -79,7 +126,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <div className="transition-transform duration-300 hover:scale-110 hover:rotate-6">
               {/* Fox Logo */}
-                <img src="/favicon.svg" alt="Entervio" className="w-16 h-16" />
+              <img src="/favicon.svg" alt="Entervio" className="w-16 h-16" />
             </div>
             <span className="text-xl font-serif font-bold text-primary">Entervio</span>
           </div>
@@ -337,22 +384,42 @@ export default function LandingPage() {
                   Soyez parmi les premiers à découvrir Entervio et transformez votre recherche d'emploi.
                 </p>
 
-                <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                <form 
+                  onSubmit={handleWaitlistSubmit} 
+                  className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+                >
                   <input
                     type="email"
                     placeholder="Votre adresse email"
-                    className="flex-1 h-20 sm:h-16 px-6 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    className="flex-1 h-20 sm:h-16 px-6 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     required
                   />
                   <Button
                     type="submit"
                     size="lg"
-                    className="h-20 sm:h-16 px-8 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-secondary-foreground/10 shadow-[var(--shadow-diffuse)] rounded-lg font-medium transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                    disabled={isSubmitting}
+                    className="h-20 sm:h-16 px-8 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-secondary-foreground/10 shadow-[var(--shadow-diffuse)] rounded-lg font-medium transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   >
-                    S'inscrire
-                    <ArrowRight className="w-5 h-5 ml-2" />
+                    {isSubmitting ? "Inscription..." : "S'inscrire"}
+                    {!isSubmitting && <ArrowRight className="w-5 h-5 ml-2" />}
                   </Button>
                 </form>
+
+                {/* Status Messages */}
+                {submitStatus.type && (
+                  <div
+                    className={`mt-4 p-4 rounded-lg ${
+                      submitStatus.type === "success"
+                        ? "bg-green-500/10 border border-green-500/20 text-green-600"
+                        : "bg-red-500/10 border border-red-500/20 text-red-600"
+                    }`}
+                  >
+                    {submitStatus.message}
+                  </div>
+                )}
 
                 <div className="flex items-center justify-center gap-6 mt-6 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
