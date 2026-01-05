@@ -450,7 +450,7 @@ function JobCard({
       <div className="flex justify-between items-center gap-3 mb-1">
         <h3
           className={cn(
-            "font-bold text-lg leading-tight transition-colors text-gray-900 flex-1",
+            "font-bold text-lg leading-tight transition-colors text-gray-900 flex-1 min-w-0",
             isSelected && "text-primary",
           )}
         >
