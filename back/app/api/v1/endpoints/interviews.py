@@ -53,52 +53,6 @@ async def start_interview(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-# @router.post("/{interview_id}/respond")
-# async def process_audio_response(
-#     interview_id: int,
-#     audio: Annotated[UploadFile, File()],
-#     user: CurrentUser,
-#     db: DbSession,
-#     background_tasks: BackgroundTasks,
-#     language: Annotated[str, Form()] = "fr",
-# ):
-#     """Process audio response from candidate."""
-#     try:
-#         logger.info(f"Processing audio for interview {interview_id}")
-
-#         # Save uploaded audio to temporary file
-#         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
-#             content = await audio.read()
-#             temp_audio.write(content)
-#             temp_audio_path = temp_audio.name
-
-#         try:
-#             # Process through service
-#             result = await interview_service.process_response(
-#                 db=db,
-#                 interview_id=interview_id,
-#                 audio_file_path=temp_audio_path,
-#                 user_id=user.id,
-#                 background_tasks=background_tasks,
-#                 language=language,
-#             )
-#             return result
-
-#         finally:
-#             # Clean up temp file
-#             try:
-#                 os.unlink(temp_audio_path)
-#             except OSError:
-#                 pass
-
-
-#     except ValueError as e:
-#         raise HTTPException(status_code=404, detail=str(e)) from e
-#     except Exception as e:
-#         logger.error(f"Error processing audio: {str(e)}")
-#         logger.exception("Full traceback:")
-#         raise HTTPException(status_code=500, detail=str(e)) from e
-#
 @router.post("/{interview_id}/respond")
 async def process_audio_response(
     interview_id: int,
@@ -109,7 +63,40 @@ async def process_audio_response(
     language: Annotated[str, Form()] = "fr",
 ):
     """Process audio response from candidate."""
-    raise HTTPException(status_code=500, detail="mabghitch nkhdm a khoya")
+    try:
+        logger.info(f"Processing audio for interview {interview_id}")
+
+        # Save uploaded audio to temporary file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
+            content = await audio.read()
+            temp_audio.write(content)
+            temp_audio_path = temp_audio.name
+
+        try:
+            # Process through service
+            result = await interview_service.process_response(
+                db=db,
+                interview_id=interview_id,
+                audio_file_path=temp_audio_path,
+                user_id=user.id,
+                background_tasks=background_tasks,
+                language=language,
+            )
+            return result
+
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_audio_path)
+            except OSError:
+                pass
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Error processing audio: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{interview_id}/end")
