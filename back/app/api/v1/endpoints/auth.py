@@ -33,16 +33,25 @@ class SignupResponse(BaseModel):
 async def signup(payload: SignupRequest, db: DbSession):
     """Create a new user account."""
     try:
-        # Create user in Supabase Auth
-        supabase = settings.supabase_admin
-        auth_response = supabase.auth.admin.create_user(
+        # Check if user already exists in local DB
+        existing = db.query(User).filter(User.email == payload.email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user with this email already exists",
+            )
+
+        # Create user using regular signup (not admin)
+        supabase = settings.supabase_client  # Use regular client instead of admin
+        auth_response = supabase.auth.sign_up(
             {
                 "email": payload.email,
                 "password": payload.password,
-                "email_confirm": True,
-                "user_metadata": {
-                    "display_name": f"{payload.first_name} {payload.last_name}",
-                    "phone": payload.phone,
+                "options": {
+                    "data": {
+                        "display_name": f"{payload.first_name} {payload.last_name}",
+                        "phone": payload.phone,
+                    }
                 },
             }
         )
@@ -51,15 +60,7 @@ async def signup(payload: SignupRequest, db: DbSession):
         if not supabase_user or not supabase_user.id:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Supabase user ID missing in response",
-            )
-
-        # Check if user already exists in local DB
-        existing = db.query(User).filter(User.email == payload.email).first()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A user with this email already exists",
+                detail="Failed to create user account",
             )
 
         # Create local user record
@@ -69,21 +70,14 @@ async def signup(payload: SignupRequest, db: DbSession):
             email=payload.email,
             phone=payload.phone,
             supabase_id=supabase_user.id,
-            is_verified=True,  # Auto-verify since we set email_confirm=True
+            is_verified=False,  # User needs to verify email
         )
         db.add(user)
         db.commit()
         db.refresh(user)
 
-        # Sign in the user to get tokens
-        sign_in_response = supabase.auth.sign_in_with_password(
-            {
-                "email": payload.email,
-                "password": payload.password,
-            }
-        )
-
-        if not sign_in_response.session:
+        # Get tokens from signup response
+        if not auth_response.session:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create session",
@@ -94,8 +88,8 @@ async def signup(payload: SignupRequest, db: DbSession):
             email=user.email,
             first_name=user.first_name,
             last_name=user.last_name,
-            access_token=sign_in_response.session.access_token,
-            refresh_token=sign_in_response.session.refresh_token,
+            access_token=auth_response.session.access_token,
+            refresh_token=auth_response.session.refresh_token,
         )
 
     except HTTPException:
@@ -122,6 +116,7 @@ async def update_me(payload: UserUpdate, user: CurrentUser, db: DbSession):
         user.last_name = payload.last_name
     if payload.phone is not None:
         user.phone = payload.phone
+
     db.commit()
     db.refresh(user)
     return user

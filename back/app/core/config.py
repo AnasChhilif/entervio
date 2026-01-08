@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     WS_HEARTBEAT_INTERVAL: int = Field(default=30)
 
     @property
+    def supabase_client(self) -> Client:
+        """Return a Supabase client with anon key for regular user operations."""
+        if not self.SUPABASE_URL or not self.SUPABASE_ANON_KEY:
+            raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY must be set")
+        return create_client(self.SUPABASE_URL, self.SUPABASE_ANON_KEY)
+
+    @property
     def supabase_admin(self) -> Client:
         """Return a Supabase client with service role privileges for admin operations."""
         if not self.SUPABASE_URL or not self.SUPABASE_SERVICE_ROLE_KEY:
