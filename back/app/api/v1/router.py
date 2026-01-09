@@ -2,7 +2,6 @@
 from fastapi import APIRouter, Depends
 
 from app.api.v1.endpoints import (
-    applications,
     auth,
     interviews,
     jobs,
@@ -14,12 +13,6 @@ from app.core.auth import get_current_user
 api_router = APIRouter()
 
 protected_router = APIRouter(dependencies=[Depends(get_current_user)])
-
-protected_router.include_router(
-    applications.router,
-    prefix="/applications",
-    tags=["applications"],
-)
 
 protected_router.include_router(
     interviews.router,

@@ -1,7 +1,7 @@
-from .application import Application
 from .comment import FeedbackComment, FeedbackCommentType
 from .feedback import Feedback
 from .interview import Interview, InterviewerStyle
+from .job import Job
 from .question_answer import QuestionAnswer
 
 __all__ = [
@@ -12,4 +12,5 @@ __all__ = [
     "FeedbackComment",
     "FeedbackCommentType",
     "Application",
+    "Job",
 ]

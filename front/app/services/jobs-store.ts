@@ -3,7 +3,6 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { api } from "~/lib/api";
 import { CACHE_CONFIG } from "~/config/cache-config";
 
-// Cache TTL from config
 const CACHE_TTL = CACHE_CONFIG.JOBS_CACHE_TTL;
 
 export interface JobOffer {
@@ -30,6 +29,7 @@ export interface JobOffer {
   contact?: {
     urlPostulation?: string;
   };
+  is_viewed?: boolean;
   is_applied?: boolean;
 }
 
@@ -59,33 +59,26 @@ interface CachedJobData {
 }
 
 interface JobsState {
-  // Cache: Map of search params to job results with timestamps
   jobsCache: Record<string, CachedJobData>;
-  
-  // Current search state
   currentJobs: JobOffer[];
   isLoading: boolean;
   hasSearched: boolean;
   lastSearchParams: SearchParams | null;
   
-  // Actions
   search: (keywords: string, location?: string) => Promise<JobOffer[]>;
   smartSearch: (location?: string, query?: string) => Promise<JobOffer[]>;
-  trackApplication: (jobId: string, jobTitle: string, companyName?: string) => Promise<void>;
+  trackJobView: (job: JobOffer) => Promise<void>;
+  trackJobApplication: (jobId: string) => Promise<void>;
+  markJobAsViewed: (jobId: string) => void;
   markJobAsApplied: (jobId: string) => void;
   tailorResume: (jobDescription: string) => Promise<Blob>;
   generateCoverLetter: (jobDescription: string) => Promise<Blob>;
-  
-  // Cache management
   getCachedJobs: (params: SearchParams) => JobOffer[] | null;
   clearCache: () => void;
   clearExpiredCache: () => void;
-  
-  // Reset state
   reset: () => void;
 }
 
-// Helper function to create cache key from search params
 const getCacheKey = (params: SearchParams): string => {
   const { keywords, location, query } = params;
   const parts = [];
@@ -97,7 +90,6 @@ const getCacheKey = (params: SearchParams): string => {
   return parts.join("|") || "empty";
 };
 
-// Helper function to check if cache entry is expired
 const isCacheExpired = (timestamp: number, ttl: number = CACHE_TTL): boolean => {
   return Date.now() - timestamp > ttl;
 };
@@ -111,201 +103,227 @@ export const useJobsStore = create<JobsState>()(
       hasSearched: false,
       lastSearchParams: null,
 
-  search: async (keywords: string, location?: string) => {
-    const params: SearchParams = { keywords, location };
-    const cacheKey = getCacheKey(params);
-    
-    // Check cache first
-    const cachedData = get().jobsCache[cacheKey];
-    if (cachedData && !isCacheExpired(cachedData.timestamp)) {
-      set({
-        currentJobs: cachedData.jobs,
-        hasSearched: true,
-        lastSearchParams: params,
-        isLoading: false,
-      });
-      return cachedData.jobs;
+      search: async (keywords: string, location?: string) => {
+        const params: SearchParams = { keywords, location };
+        const cacheKey = getCacheKey(params);
+        
+        const cachedData = get().jobsCache[cacheKey];
+        if (cachedData && !isCacheExpired(cachedData.timestamp)) {
+          set({
+            currentJobs: cachedData.jobs,
+            hasSearched: true,
+            lastSearchParams: params,
+            isLoading: false,
+          });
+          return cachedData.jobs;
+        }
+
+        set({ isLoading: true, lastSearchParams: params });
+        
+        try {
+          const searchParams = new URLSearchParams({ keywords });
+          if (location) searchParams.append("location", location);
+          
+          const response = await api.get(`/jobs/search?${searchParams.toString()}`);
+          const jobs: JobOffer[] = response.data;
+          
+          set({
+            jobsCache: { 
+              ...get().jobsCache, 
+              [cacheKey]: { jobs, timestamp: Date.now() } 
+            },
+            currentJobs: jobs,
+            isLoading: false,
+            hasSearched: true,
+          });
+          
+          return jobs;
+        } catch (error) {
+          set({ isLoading: false, hasSearched: true });
+          throw error;
+        }
+      },
+
+      smartSearch: async (location?: string, query?: string) => {
+        const params: SearchParams = { location, query };
+        const cacheKey = getCacheKey(params);
+        
+        const cachedData = get().jobsCache[cacheKey];
+        if (cachedData && !isCacheExpired(cachedData.timestamp)) {
+          set({
+            currentJobs: cachedData.jobs,
+            hasSearched: true,
+            lastSearchParams: params,
+            isLoading: false,
+          });
+          return cachedData.jobs;
+        }
+
+        set({ isLoading: true, lastSearchParams: params });
+        
+        try {
+          const searchParams = new URLSearchParams();
+          if (location) searchParams.append("location", location);
+          if (query) searchParams.append("query", query);
+          
+          const response = await api.get(`/jobs/smart-search?${searchParams.toString()}`);
+          const jobs: JobOffer[] = response.data;
+          
+          set({
+            jobsCache: { 
+              ...get().jobsCache, 
+              [cacheKey]: { jobs, timestamp: Date.now() } 
+            },
+            currentJobs: jobs,
+            isLoading: false,
+            hasSearched: true,
+          });
+          
+          return jobs;
+        } catch (error) {
+          set({ isLoading: false, hasSearched: true });
+          throw error;
+        }
+      },
+
+      trackJobView: async (job: JobOffer) => {
+        try {
+          await api.post("/jobs/view", {
+            job_id: job.id,
+            job_title: job.intitule,
+            company_name: job.entreprise?.nom,
+            status: "VIEWED",
+          });
+          
+          get().markJobAsViewed(job.id);
+        } catch (error) {
+          console.error("Failed to track job view:", error);
+        }
+      },
+
+      trackJobApplication: async (jobId: string) => {
+        try {
+          await api.post(`/jobs/apply/${jobId}`, {});
+          get().markJobAsApplied(jobId);
+        } catch (error) {
+          console.error("Failed to track job application:", error);
+          get().markJobAsApplied(jobId);
+        }
+      },
+
+      markJobAsViewed: (jobId: string) => {
+        const updatedJobs = get().currentJobs.map((job) =>
+          job.id === jobId ? { ...job, is_viewed: true } : job
+        );
+        
+        const currentCache = get().jobsCache;
+        const newCache: Record<string, CachedJobData> = {};
+        
+        Object.entries(currentCache).forEach(([key, cachedData]) => {
+          newCache[key] = {
+            jobs: cachedData.jobs.map((job) =>
+              job.id === jobId ? { ...job, is_viewed: true } : job
+            ),
+            timestamp: cachedData.timestamp,
+          };
+        });
+        
+        set({
+          currentJobs: updatedJobs,
+          jobsCache: newCache,
+        });
+      },
+
+      markJobAsApplied: (jobId: string) => {
+        const updatedJobs = get().currentJobs.map((job) =>
+          job.id === jobId ? { ...job, is_viewed: true, is_applied: true } : job
+        );
+        
+        const currentCache = get().jobsCache;
+        const newCache: Record<string, CachedJobData> = {};
+        
+        Object.entries(currentCache).forEach(([key, cachedData]) => {
+          newCache[key] = {
+            jobs: cachedData.jobs.map((job) =>
+              job.id === jobId ? { ...job, is_viewed: true, is_applied: true } : job
+            ),
+            timestamp: cachedData.timestamp,
+          };
+        });
+        
+        set({
+          currentJobs: updatedJobs,
+          jobsCache: newCache,
+        });
+      },
+
+      tailorResume: async (jobDescription: string) => {
+        const user = await api
+          .get("/auth/me")
+          .then((r) => r.data)
+          .catch(() => null);
+        
+        if (!user) throw new Error("User not authenticated");
+        
+        return api.postBlob("/resume/tailor", {
+          user_id: user.id,
+          job_description: jobDescription,
+        });
+      },
+
+      generateCoverLetter: async (jobDescription: string) => {
+        return api.postBlob("/resume/cover-letter", {
+          job_description: jobDescription,
+        });
+      },
+
+      getCachedJobs: (params: SearchParams) => {
+        const cacheKey = getCacheKey(params);
+        const cachedData = get().jobsCache[cacheKey];
+        
+        if (!cachedData || isCacheExpired(cachedData.timestamp)) {
+          return null;
+        }
+        
+        return cachedData.jobs;
+      },
+
+      clearCache: () => {
+        set({ jobsCache: {} });
+      },
+
+      clearExpiredCache: () => {
+        const currentCache = get().jobsCache;
+        const newCache: Record<string, CachedJobData> = {};
+        
+        Object.entries(currentCache).forEach(([key, cachedData]) => {
+          if (!isCacheExpired(cachedData.timestamp)) {
+            newCache[key] = cachedData;
+          }
+        });
+        
+        set({ jobsCache: newCache });
+      },
+
+      reset: () => {
+        set({
+          currentJobs: [],
+          isLoading: false,
+          hasSearched: false,
+          lastSearchParams: null,
+        });
+      },
+    }),
+    {
+      name: "jobs-storage",
+      version: 2,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        jobsCache: state.jobsCache,
+        currentJobs: state.currentJobs,
+        hasSearched: state.hasSearched,
+        lastSearchParams: state.lastSearchParams,
+      }),
     }
-
-    // Fetch from API
-    set({ isLoading: true, lastSearchParams: params });
-    
-    try {
-      const searchParams = new URLSearchParams({ keywords });
-      if (location) searchParams.append("location", location);
-      
-      const response = await api.get(`/jobs/search?${searchParams.toString()}`);
-      const jobs: JobOffer[] = response.data;
-      
-      // Update cache with timestamp
-      set({
-        jobsCache: { 
-          ...get().jobsCache, 
-          [cacheKey]: { jobs, timestamp: Date.now() } 
-        },
-        currentJobs: jobs,
-        isLoading: false,
-        hasSearched: true,
-      });
-      
-      return jobs;
-    } catch (error) {
-      set({ isLoading: false, hasSearched: true });
-      throw error;
-    }
-  },
-
-  smartSearch: async (location?: string, query?: string) => {
-    const params: SearchParams = { location, query };
-    const cacheKey = getCacheKey(params);
-    
-    // Check cache first
-    const cachedData = get().jobsCache[cacheKey];
-    if (cachedData && !isCacheExpired(cachedData.timestamp)) {
-      set({
-        currentJobs: cachedData.jobs,
-        hasSearched: true,
-        lastSearchParams: params,
-        isLoading: false,
-      });
-      return cachedData.jobs;
-    }
-
-    // Fetch from API
-    set({ isLoading: true, lastSearchParams: params });
-    
-    try {
-      const searchParams = new URLSearchParams();
-      if (location) searchParams.append("location", location);
-      if (query) searchParams.append("query", query);
-      
-      const response = await api.get(`/jobs/smart-search?${searchParams.toString()}`);
-      const jobs: JobOffer[] = response.data;
-      
-      // Update cache with timestamp
-      set({
-        jobsCache: { 
-          ...get().jobsCache, 
-          [cacheKey]: { jobs, timestamp: Date.now() } 
-        },
-        currentJobs: jobs,
-        isLoading: false,
-        hasSearched: true,
-      });
-      
-      return jobs;
-    } catch (error) {
-      set({ isLoading: false, hasSearched: true });
-      throw error;
-    }
-  },
-
-  trackApplication: async (jobId: string, jobTitle: string, companyName?: string) => {
-    await api.post("/applications/", {
-      job_id: jobId,
-      job_title: jobTitle,
-      company_name: companyName,
-    });
-    
-    // Mark job as applied in state
-    get().markJobAsApplied(jobId);
-  },
-
-  markJobAsApplied: (jobId: string) => {
-    // Update current jobs
-    const updatedJobs = get().currentJobs.map((job) =>
-      job.id === jobId ? { ...job, is_applied: true } : job
-    );
-    
-    // Update all caches (preserve timestamps)
-    const currentCache = get().jobsCache;
-    const newCache: Record<string, CachedJobData> = {};
-    
-    Object.entries(currentCache).forEach(([key, cachedData]) => {
-      newCache[key] = {
-        jobs: cachedData.jobs.map((job) =>
-          job.id === jobId ? { ...job, is_applied: true } : job
-        ),
-        timestamp: cachedData.timestamp, // Preserve original timestamp
-      };
-    });
-    
-    set({
-      currentJobs: updatedJobs,
-      jobsCache: newCache,
-    });
-  },
-
-  tailorResume: async (jobDescription: string) => {
-    const user = await api
-      .get("/auth/me")
-      .then((r) => r.data)
-      .catch(() => null);
-    
-    if (!user) throw new Error("User not authenticated");
-    
-    return api.postBlob("/resume/tailor", {
-      user_id: user.id,
-      job_description: jobDescription,
-    });
-  },
-
-  generateCoverLetter: async (jobDescription: string) => {
-    return api.postBlob("/resume/cover-letter", {
-      job_description: jobDescription,
-    });
-  },
-
-  getCachedJobs: (params: SearchParams) => {
-    const cacheKey = getCacheKey(params);
-    const cachedData = get().jobsCache[cacheKey];
-    
-    if (!cachedData || isCacheExpired(cachedData.timestamp)) {
-      return null;
-    }
-    
-    return cachedData.jobs;
-  },
-
-  clearCache: () => {
-    set({ jobsCache: {} });
-  },
-
-  clearExpiredCache: () => {
-    const currentCache = get().jobsCache;
-    const newCache: Record<string, CachedJobData> = {};
-    
-    // Keep only non-expired entries
-    Object.entries(currentCache).forEach(([key, cachedData]) => {
-      if (!isCacheExpired(cachedData.timestamp)) {
-        newCache[key] = cachedData;
-      }
-    });
-    
-    set({ jobsCache: newCache });
-  },
-
-  reset: () => {
-    set({
-      currentJobs: [],
-      isLoading: false,
-      hasSearched: false,
-      lastSearchParams: null,
-    });
-  },
-}),
-{
-  name: "jobs-storage", // name of the item in localStorage
-  version: 1, // increment this to clear old cache if needed
-  storage: createJSONStorage(() => localStorage),
-  partialize: (state) => ({
-    // Only persist these fields
-    jobsCache: state.jobsCache,
-    currentJobs: state.currentJobs,
-    hasSearched: state.hasSearched,
-    lastSearchParams: state.lastSearchParams,
-    // Don't persist isLoading or _hasHydrated
-  }),
-}
   )
 );

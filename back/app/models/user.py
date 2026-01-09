@@ -48,8 +48,8 @@ class User(Base):
     supabase_id = Column(Text, nullable=True, unique=True)
 
     interviews = relationship("Interview", back_populates="user")
-    applications = relationship(
-        "Application", back_populates="user", cascade="all, delete-orphan"
+    jobs = relationship(
+        "Job", back_populates="user", cascade="all, delete-orphan"
     )
 
     @property

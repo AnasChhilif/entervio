@@ -20,14 +20,10 @@ import { useSetupStore } from "~/services/usesetupstore";
 import { cn } from "~/lib/utils";
 
 function formatSalary(salary: string): string {
-  // Example: "Annuel de 35000.0 Euros à 39000.0 Euros sur 12.0 mois"
-  // Example: "Mensuel de 32000.0 Euros à 35000.0 Euros sur 12.0 mois"
   try {
-    // Extract numbers (handle 35000.0, 35000, 35 000)
     const matches = salary.replace(/\s/g, "").match(/(\d+(?:[\.,]\d+)?)/g);
 
     if (matches && matches.length >= 1) {
-      // Parse numbers (replace comma with dot if needed)
       const nums = matches.map((m) => parseFloat(m.replace(",", ".")));
       const min = nums[0];
       const max = nums.length > 1 ? nums[1] : min;
@@ -57,8 +53,6 @@ function formatSalary(salary: string): string {
     return salary;
   }
 }
-
-// --- Components ---
 
 import {
   Dialog,
@@ -102,7 +96,6 @@ function TailorResumeDialog({
     "Génération du PDF...",
   ];
 
-  // Cleanup blob URL when dialog closes
   useEffect(() => {
     if (!isOpen && pdfUrl) {
       window.URL.revokeObjectURL(pdfUrl);
@@ -116,7 +109,6 @@ function TailorResumeDialog({
     let msgIndex = 0;
     setLoadingMessage(messages[0]);
 
-    // Cycle through messages while loading
     const interval = setInterval(() => {
       msgIndex = (msgIndex + 1) % messages.length;
       setLoadingMessage(messages[msgIndex]);
@@ -270,7 +262,6 @@ function GenerateCoverLetterDialog({
     "Génération du PDF...",
   ];
 
-  // Cleanup blob URL when dialog closes
   useEffect(() => {
     if (!isOpen && pdfUrl) {
       window.URL.revokeObjectURL(pdfUrl);
@@ -284,7 +275,6 @@ function GenerateCoverLetterDialog({
     let msgIndex = 0;
     setLoadingMessage(messages[0]);
 
-    // Cycle through messages while loading
     const interval = setInterval(() => {
       msgIndex = (msgIndex + 1) % messages.length;
       setLoadingMessage(messages[msgIndex]);
@@ -425,6 +415,15 @@ function JobCard({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const trackJobView = useJobsStore((state) => state.trackJobView);
+
+  const handleClick = async () => {
+    if (!job.is_viewed) {
+      await trackJobView(job);
+    }
+    onClick();
+  };
+
   const matchTextColor =
     job.relevance_score && job.relevance_score >= 80
       ? "text-emerald-600"
@@ -432,14 +431,13 @@ function JobCard({
 
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         "group relative p-5 transition-all duration-200 cursor-pointer hover:bg-gray-50",
         isSelected ? "bg-white" : "bg-white",
-        "border-b border-gray-100 last:border-0", // Hairline separator
+        "border-b border-gray-100 last:border-0",
       )}
     >
-      {/* Left Edge Indicator */}
       <div
         className={cn(
           "absolute left-0 top-0 bottom-0 w-1 transition-colors",
@@ -458,7 +456,6 @@ function JobCard({
         </h3>
 
         <div className="flex items-center gap-2">
-          {/* Match Score: Badge of Honor */}
           {job.relevance_score !== undefined && (
             <div
               className={cn(
@@ -472,7 +469,6 @@ function JobCard({
         </div>
       </div>
 
-      {/* Naked Data: Company · Location · Salary */}
       <div className="flex flex-wrap items-center gap-x-2 text-sm text-gray-500 font-medium mb-3">
         <span className="uppercase tracking-wide text-xs font-bold text-gray-400">
           {job.entreprise?.nom || "Confidentiel"}
@@ -491,7 +487,6 @@ function JobCard({
         )}
       </div>
 
-      {/* Inline AI Insight */}
       {job.relevance_reasoning && (
         <div className="flex items-start gap-2 text-sm text-gray-600 font-bold leading-relaxed mb-6">
           <Sparkles className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -499,11 +494,15 @@ function JobCard({
         </div>
       )}
 
-      {/* Arrow Action & Applied Badge (Bottom Right) */}
       <div className="absolute right-4 bottom-4 flex items-center gap-2">
         {job.is_applied && (
           <span className="shrink-0 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full border border-green-200">
             Déjà postulé
+          </span>
+        )}
+        {job.is_viewed && !job.is_applied && (
+          <span className="shrink-0 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full border border-blue-200">
+            Vu
           </span>
         )}
         <ArrowRight className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -521,9 +520,8 @@ function JobDetail({
 }) {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const trackApplication = useJobsStore((state) => state.trackApplication);
+  const trackJobApplication = useJobsStore((state) => state.trackJobApplication);
 
-  // Scroll to top when job changes
   useEffect(() => {
     if (job?.id && scrollRef.current) {
       scrollRef.current.scrollTo({ top: 0, behavior: "instant" });
@@ -556,12 +554,10 @@ function JobDetail({
   const handlePostulerClick = async () => {
     if (!applyUrl) return;
 
-    // 1. Open link immediately (best UX)
     window.open(applyUrl, "_blank", "noopener,noreferrer");
 
-    // 2. Track in backend
     try {
-      await trackApplication(job.id, job.intitule, job.entreprise?.nom);
+      await trackJobApplication(job.id);
     } catch (error) {
       console.error("Failed to track application:", error);
     }
@@ -572,13 +568,10 @@ function JobDetail({
       ref={scrollRef}
       className={cn(
         "bg-white border-gray-100 shadow-sm",
-        // DESKTOP: Fixed height container with internal scroll
         "lg:h-full lg:overflow-y-auto lg:rounded-2xl lg:border",
-        // MOBILE: Let it be a normal, fluid element (handled by parent overflow if needed, but usually mobile is stacked)
         "h-full overflow-y-auto w-full relative",
       )}
     >
-      {" "}
       <Button
         onClick={onBack}
         variant="ghost"
@@ -586,7 +579,7 @@ function JobDetail({
       >
         <ArrowLeft className="w-5 h-5" />
       </Button>
-      {/* Header Image/Pattern */}
+
       <div className="h-32 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-100 relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-30"
@@ -596,13 +589,12 @@ function JobDetail({
           }}
         ></div>
       </div>
+
       <div className="px-8 pb-12 -mt-12 relative">
-        {/* Company Logo (Placeholder) */}
         <div className="w-24 h-24 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center mb-6">
           <Building2 className="w-10 h-10 text-gray-800" />
         </div>
 
-        {/* Title & Actions */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
           <div>
             {job.is_applied && (
@@ -691,7 +683,6 @@ function JobDetail({
           </div>
         </div>
 
-        {/* AI Analysis */}
         {job.relevance_reasoning && (
           <div className="mb-10 p-6 bg-emerald-50/40 rounded-2xl border border-emerald-100/50">
             <div className="flex items-center gap-2 mb-4">
@@ -713,7 +704,6 @@ function JobDetail({
           </div>
         )}
 
-        {/* Details Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
           <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
             <p className="text-xs font-medium text-gray-500 uppercase mb-1">
@@ -747,7 +737,6 @@ function JobDetail({
           </div>
         </div>
 
-        {/* Description */}
         <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed">
           <h3 className=" font-bold text-gray-900 text-xl mb-4">
             Description du poste
@@ -763,7 +752,6 @@ export default function JobsSearch() {
   const [nlQuery, setNlQuery] = useState("");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  // Use store state with safe defaults
   const currentJobs = useJobsStore((state) => state.currentJobs ?? []);
   const isLoading = useJobsStore((state) => state.isLoading ?? false);
   const hasSearched = useJobsStore((state) => state.hasSearched ?? false);
@@ -801,7 +789,6 @@ export default function JobsSearch() {
 
   return (
     <div className="h-full bg-[#FAFAFA] text-gray-900 font-sans flex flex-col overflow-hidden">
-      {/* Header & Search */}
       <div className="bg-white border-b border-gray-200 shrink-0 z-30">
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -814,7 +801,6 @@ export default function JobsSearch() {
               </p>
             </div>
 
-            {/* Search Bar */}
             <div className="flex-1 max-w-2xl">
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -845,7 +831,6 @@ export default function JobsSearch() {
             </div>
           </div>
 
-          {/* Quick Chips */}
           <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
             {quickChips.map((chip) => (
               <button
@@ -860,11 +845,9 @@ export default function JobsSearch() {
         </div>
       </div>
 
-      {/* Main Content: Split View */}
       <div className="flex-1 min-h-0 w-full max-w-[1600px] mx-auto p-4 md:p-6">
         {currentJobs.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-            {/* Left Column: List (Scrollable) */}
             <div
               className={cn(
                 "lg:col-span-4 h-full overflow-y-auto custom-scrollbar pr-2 space-y-3 pb-20",
@@ -886,7 +869,6 @@ export default function JobsSearch() {
               ))}
             </div>
 
-            {/* Right Column: Detail (Independent Scroll) */}
             <div
               className={cn("lg:col-span-8 h-full overflow-hidden", {
                 block: showDetail,
@@ -919,7 +901,6 @@ export default function JobsSearch() {
             </p>
           </div>
         ) : (
-          // Loading State
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full animate-pulse">
             <div className="lg:col-span-4 space-y-4">
               {[1, 2, 3, 4].map((i) => (

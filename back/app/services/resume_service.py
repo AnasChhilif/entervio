@@ -269,7 +269,7 @@ class ResumeParserService:
             raise e
 
         # 3. Compile PDF
-        logger.info("📝 Compiling PDF with Typst...")
+        logger.info("Compiling PDF with Typst...")
         try:
             return self._compile_pdf(tailored_data)
         except Exception as e:
